@@ -1,12 +1,27 @@
 """Tests for the initial SQLite schema."""
 
 import sqlite3
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
 
 from app.database import connect
 from app.db_schema import init_db
+
+
+def test_connection_can_be_queried_and_closed_from_another_thread(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "employees.db"))
+
+    connection = connect()
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        result = executor.submit(
+            lambda: (connection.execute("SELECT 1").fetchone()[0], connection.close())
+        ).result()
+
+    assert result == (1, None)
 
 
 def _insert_employee(connection: sqlite3.Connection, **overrides: object) -> None:
