@@ -1,0 +1,89 @@
+"""Tests for the initial SQLite schema."""
+
+import sqlite3
+from pathlib import Path
+
+import pytest
+
+from app.database import connect
+from app.schema import init_db
+
+
+def _insert_employee(connection: sqlite3.Connection, **overrides: object) -> None:
+    employee = {
+        "employee_id": "EMP-00001",
+        "name": "Alex Example",
+        "department": "Operations",
+        "country": "India",
+        "employment_status": "Active",
+        "annual_gross_base_salary": 50000,
+        "currency": "INR",
+    }
+    employee.update(overrides)
+    columns = ", ".join(employee)
+    placeholders = ", ".join("?" for _ in employee)
+    connection.execute(
+        f"INSERT INTO employees ({columns}) VALUES ({placeholders})",
+        tuple(employee.values()),
+    )
+
+
+def test_init_db_creates_table_and_indexes_idempotently(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "employees.db"))
+
+    init_db()
+    init_db()
+
+    connection = connect()
+    try:
+        columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(employees)")
+        }
+        indexes = {
+            row["name"] for row in connection.execute("PRAGMA index_list(employees)")
+        }
+    finally:
+        connection.close()
+
+    assert columns == {
+        "employee_id",
+        "name",
+        "department",
+        "country",
+        "employment_status",
+        "annual_gross_base_salary",
+        "currency",
+    }
+    assert {
+        "idx_employees_country",
+        "idx_employees_department",
+        "idx_employees_employment_status",
+        "idx_employees_currency",
+    } <= indexes
+
+
+def test_employee_constraints_reject_invalid_values(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "employees.db"))
+    init_db()
+
+    connection = connect()
+    try:
+        with connection:
+            _insert_employee(connection)
+        invalid_employees = (
+            {"employee_id": "EMP-00002", "employment_status": "On leave"},
+            {"employee_id": "EMP-00003", "currency": "XYZ"},
+            {"employee_id": "EMP-00004", "annual_gross_base_salary": -1},
+            {"employee_id": "EMP-1"},
+            {"employee_id": "EMP-00001"},
+        )
+        for invalid_employee in invalid_employees:
+            with pytest.raises(sqlite3.IntegrityError):
+                with connection:
+                    _insert_employee(connection, **invalid_employee)
+    finally:
+        connection.close()
