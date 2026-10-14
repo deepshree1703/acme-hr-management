@@ -79,3 +79,18 @@ class EmployeeListResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
+
+
+class CurrencySalarySummary(BaseModel):
+    """Employee count and average salary in one currency."""
+
+    currency: str
+    headcount: int
+    average_annual_gross_base_salary: float
+
+
+class SalaryDashboardResponse(BaseModel):
+    """Salary summaries by currency and the overall employee headcount."""
+
+    currencies: list[CurrencySalarySummary]
+    total_headcount: int
