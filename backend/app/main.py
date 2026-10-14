@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException
 
 from app.database import check_database
 from app.db_schema import init_db
+from app.routers.employees import router as employees_router
 
 
 @asynccontextmanager
@@ -22,6 +23,7 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+app.include_router(employees_router)
 
 
 @app.get("/health", tags=["health"])
