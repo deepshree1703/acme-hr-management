@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 
 from app.database import check_database
-from app.schema import init_db
+from app.db_schema import init_db
 
 
 @asynccontextmanager
