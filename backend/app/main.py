@@ -1,15 +1,26 @@
 """FastAPI application entry point."""
 
 import sqlite3
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 
 from app.database import check_database
+from app.schema import init_db
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    """Initialize the local database schema before serving requests."""
+    init_db()
+    yield
 
 app = FastAPI(
     title="ACME Employee Salary Management API",
     description="Backend API for the ACME Employee Salary Management project.",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 
