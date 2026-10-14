@@ -1,14 +1,6 @@
 import { NavLink, Route, Routes } from "react-router-dom";
 import Dashboard from "./pages/Dashboard.jsx";
-
-function EmployeesPlaceholder() {
-  return (
-    <section className="panel placeholder">
-      <h1>Employees</h1>
-      <p>The employee directory will be available here soon.</p>
-    </section>
-  );
-}
+import Employees from "./pages/Employees.jsx";
 
 export default function App() {
   return (
@@ -26,7 +18,7 @@ export default function App() {
       <main className="main-content">
         <Routes>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/employees" element={<EmployeesPlaceholder />} />
+          <Route path="/employees" element={<Employees />} />
           <Route path="*" element={<Dashboard />} />
         </Routes>
       </main>

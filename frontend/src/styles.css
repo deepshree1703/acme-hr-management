@@ -59,6 +59,32 @@ td.salary { color: #182230; font-weight: 600; font-variant-numeric: tabular-nums
 .placeholder { padding: 28px; }
 .placeholder h1 { font-size: 24px; }
 .placeholder p { margin-bottom: 0; color: #667085; }
+.employee-panel { overflow: hidden; }
+.employee-toolbar { display: grid; grid-template-columns: minmax(210px, 1.6fr) repeat(3, minmax(135px, 1fr)); gap: 13px; padding: 20px 22px; border-bottom: 1px solid #edf0f4; }
+.employee-toolbar label { display: flex; min-width: 0; flex-direction: column; gap: 7px; }
+.employee-toolbar label > span { color: #667085; font-size: 11px; font-weight: 600; }
+.employee-toolbar input, .employee-toolbar select { width: 100%; height: 38px; padding: 0 11px; border: 1px solid #d9e0e8; border-radius: 7px; outline: none; background: #fff; color: #344054; font: inherit; font-size: 12px; }
+.employee-toolbar input:focus, .employee-toolbar select:focus { border-color: #6a9af8; box-shadow: 0 0 0 3px rgb(52 120 246 / 12%); }
+.employee-toolbar input::placeholder { color: #a0aaba; }
+.filter-error { margin: 12px 22px 0; color: #b54708; font-size: 12px; }
+.employee-table { min-width: 850px; }
+.employee-table th, .employee-table td { padding-right: 17px; padding-left: 17px; }
+.employee-table th:first-child, .employee-table td:first-child { padding-left: 22px; }
+.employee-table th:last-child, .employee-table td:last-child { padding-right: 22px; }
+.employee-id { color: #667085; font-size: 12px; font-variant-numeric: tabular-nums; }
+.employee-name { color: #344054; font-weight: 600; }
+.status-pill { display: inline-block; padding: 4px 8px; border-radius: 20px; font-size: 10px; font-weight: 600; }
+.status-pill.active { background: #ecfdf3; color: #027a48; }
+.status-pill.inactive { background: #f2f4f7; color: #667085; }
+.salary-currency { color: #7b8798; font-size: 10px; font-weight: 700; letter-spacing: .4px; }
+.pagination { display: flex; align-items: center; justify-content: space-between; min-height: 58px; padding: 10px 22px; border-top: 1px solid #edf0f4; }
+.match-count { color: #7b8798; font-size: 12px; }
+.page-controls { display: flex; align-items: center; gap: 9px; }
+.page-count { margin-right: 4px; color: #667085; font-size: 12px; }
+.page-controls button { height: 31px; padding: 0 11px; border: 1px solid #d9e0e8; border-radius: 6px; background: #fff; color: #344054; font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; }
+.page-controls button:hover:not(:disabled) { background: #f8fafc; border-color: #b8c4d3; }
+.page-controls button:disabled { color: #b3bdc9; cursor: not-allowed; }
+.employee-empty { padding: 30px 22px; }
 @media (max-width: 600px) {
   .site-header { height: 64px; padding: 0 18px; }
   nav { gap: 20px; }
@@ -69,4 +95,9 @@ td.salary { color: #182230; font-weight: 600; font-variant-numeric: tabular-nums
   .section-heading { padding: 18px; }
   th, td { padding-right: 18px; padding-left: 18px; white-space: nowrap; }
   .table-note { padding-right: 18px; padding-left: 18px; line-height: 1.5; }
+  .employee-toolbar { grid-template-columns: 1fr 1fr; padding: 16px; }
+  .employee-toolbar .search-field { grid-column: 1 / -1; }
+  .pagination { align-items: flex-start; gap: 12px; flex-direction: column; padding: 14px 16px; }
+  .employee-table th:first-child, .employee-table td:first-child { padding-left: 16px; }
+  .employee-table th:last-child, .employee-table td:last-child { padding-right: 16px; }
 }
