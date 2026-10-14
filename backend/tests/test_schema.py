@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from app.database import connect
-from app.schema import init_db
+from app.db_schema import init_db
 
 
 def _insert_employee(connection: sqlite3.Connection, **overrides: object) -> None:
