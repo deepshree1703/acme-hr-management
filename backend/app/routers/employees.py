@@ -1,20 +1,57 @@
 """Employee create and fetch routes."""
 
+import math
+import re
 import sqlite3
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from app.constants import EMPLOYMENT_STATUSES, PAGE_SIZE
 from app.database import get_connection
 from app.repository import (
     DuplicateEmployeeError,
     create_employee as repository_create_employee,
     delete_employee as repository_delete_employee,
     get_employee_by_id as repository_get_employee_by_id,
+    list_employees as repository_list_employees,
     update_employee as repository_update_employee,
 )
-from app.schemas import EmployeeCreate, EmployeeRead, EmployeeUpdate
+from app.schemas import (
+    EmployeeCreate,
+    EmployeeListResponse,
+    EmployeeRead,
+    EmployeeUpdate,
+)
 
 router = APIRouter(prefix="/employees", tags=["employees"])
+_STATUS_PATTERN = rf"^(?:{'|'.join(re.escape(value) for value in EMPLOYMENT_STATUSES)})$"
+
+
+@router.get("", response_model=EmployeeListResponse)
+def list_employees(
+    search: str | None = None,
+    country: str | None = None,
+    department: str | None = None,
+    employment_status: str | None = Query(default=None, pattern=_STATUS_PATTERN),
+    page: int = Query(default=1, ge=1),
+    connection: sqlite3.Connection = Depends(get_connection),
+) -> EmployeeListResponse:
+    """List employees using filters and fixed-size backend pagination."""
+    items, total = repository_list_employees(
+        connection,
+        page=page,
+        search=search,
+        country=country,
+        department=department,
+        employment_status=employment_status,
+    )
+    return EmployeeListResponse(
+        items=items,
+        total=total,
+        page=page,
+        page_size=PAGE_SIZE,
+        total_pages=math.ceil(total / PAGE_SIZE),
+    )
 
 
 @router.post("", response_model=EmployeeRead, status_code=status.HTTP_201_CREATED)

@@ -2,6 +2,7 @@
 
 import sqlite3
 
+from app.constants import PAGE_SIZE
 from app.schemas import EmployeeCreate, EmployeeRead, EmployeeUpdate
 
 _EMPLOYEE_SELECT = """
@@ -115,3 +116,59 @@ def delete_employee(connection: sqlite3.Connection, employee_id: str) -> bool:
             (employee_id,),
         )
     return cursor.rowcount > 0
+
+
+def list_employees(
+    connection: sqlite3.Connection,
+    *,
+    page: int,
+    search: str | None = None,
+    country: str | None = None,
+    department: str | None = None,
+    employment_status: str | None = None,
+) -> tuple[list[EmployeeRead], int]:
+    """Return one fixed-size employee page and the total matching count."""
+    conditions: list[str] = []
+    parameters: list[str] = []
+
+    if search:
+        conditions.append(
+            "(LOWER(name) LIKE LOWER(?) ESCAPE '!' "
+            "OR LOWER(employee_id) LIKE LOWER(?) ESCAPE '!')"
+        )
+        escaped_search = search.replace("!", "!!").replace("%", "!%").replace("_", "!_")
+        parameters.extend((f"%{escaped_search}%", f"{escaped_search}%"))
+    if country is not None:
+        conditions.append("country = ?")
+        parameters.append(country)
+    if department is not None:
+        conditions.append("department = ?")
+        parameters.append(department)
+    if employment_status is not None:
+        conditions.append("employment_status = ?")
+        parameters.append(employment_status)
+
+    where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    total = connection.execute(
+        f"SELECT COUNT(*) FROM employees {where_clause}",
+        parameters,
+    ).fetchone()[0]
+    rows = connection.execute(
+        f"""
+        SELECT
+            employee_id,
+            name,
+            department,
+            country,
+            employment_status,
+            annual_gross_base_salary,
+            currency
+        FROM employees
+        {where_clause}
+        ORDER BY employee_id
+        LIMIT ? OFFSET ?
+        """,
+        (*parameters, PAGE_SIZE, (page - 1) * PAGE_SIZE),
+    ).fetchall()
+
+    return [EmployeeRead.model_validate(dict(row)) for row in rows], total
