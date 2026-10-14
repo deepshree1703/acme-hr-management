@@ -8,9 +8,11 @@ from app.database import get_connection
 from app.repository import (
     DuplicateEmployeeError,
     create_employee as repository_create_employee,
+    delete_employee as repository_delete_employee,
     get_employee_by_id as repository_get_employee_by_id,
+    update_employee as repository_update_employee,
 )
-from app.schemas import EmployeeCreate, EmployeeRead
+from app.schemas import EmployeeCreate, EmployeeRead, EmployeeUpdate
 
 router = APIRouter(prefix="/employees", tags=["employees"])
 
@@ -43,3 +45,33 @@ def get_employee(
             detail="Employee not found",
         )
     return employee
+
+
+@router.put("/{employee_id}", response_model=EmployeeRead)
+def update_employee(
+    employee_id: str,
+    employee: EmployeeUpdate,
+    connection: sqlite3.Connection = Depends(get_connection),
+) -> EmployeeRead:
+    """Replace an employee's editable fields."""
+    updated_employee = repository_update_employee(connection, employee_id, employee)
+    if updated_employee is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Employee not found",
+        )
+    return updated_employee
+
+
+@router.delete("/{employee_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_employee(
+    employee_id: str,
+    connection: sqlite3.Connection = Depends(get_connection),
+) -> None:
+    """Delete an employee record."""
+    deleted = repository_delete_employee(connection, employee_id)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Employee not found",
+        )
