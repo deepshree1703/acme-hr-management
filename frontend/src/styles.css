@@ -1,0 +1,72 @@
+:root {
+  font-family: Arial, Helvetica, sans-serif;
+  color: #182230;
+  background: #f5f7fa;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-optical-sizing: auto;
+  font-weight: 400;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+a { color: inherit; text-decoration: none; }
+.app-shell { min-height: 100vh; }
+.site-header {
+  height: 72px; padding: 0 max(32px, calc((100vw - 1120px) / 2));
+  display: flex; align-items: center; justify-content: space-between;
+  background: #fff; border-bottom: 1px solid #e8edf2;
+}
+.brand { display: inline-flex; align-items: center; gap: 10px; font: 800 17px Arial, sans-serif; letter-spacing: -.4px; }
+.brand-mark { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; color: #fff; background: #2563eb; font: 800 17px Arial, sans-serif; }
+.brand-light { color: #738096; font-weight: 500; }
+nav { height: 100%; display: flex; gap: 30px; }
+nav a { display: inline-flex; align-items: center; position: relative; color: #667085; font-size: 14px; font-weight: 600; }
+nav a.active { color: #2459cf; }
+nav a.active::after { content: ""; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: #3478f6; border-radius: 2px 2px 0 0; }
+.main-content { max-width: 1120px; margin: 0 auto; padding: 48px 32px 72px; }
+.page-heading { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 28px; }
+.eyebrow { margin: 0 0 7px; color: #3478f6; font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; }
+h1, h2, p { margin-top: 0; }
+h1, h2 { font-family: Arial, sans-serif; letter-spacing: -.6px; }
+h1 { margin-bottom: 7px; font-size: 29px; font-weight: 700; }
+.page-subtitle { margin-bottom: 0; color: #788497; font-size: 14px; }
+.panel { background: #fff; border: 1px solid #e8edf2; border-radius: 12px; box-shadow: 0 2px 5px rgb(16 24 40 / 3%); }
+.headcount-card { display: flex; align-items: center; gap: 17px; width: fit-content; min-width: 280px; padding: 20px 24px; margin-bottom: 25px; }
+.metric-icon { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 12px; background: #eef4ff; font-size: 20px; }
+.metric-label { margin-bottom: 4px; color: #718096; font-size: 13px; font-weight: 500; }
+.metric-value { margin-bottom: 2px; font: 800 25px Arial, sans-serif; letter-spacing: -.5px; }
+.metric-caption { margin-bottom: 0; color: #98a2b3; font-size: 11px; }
+.summary-panel { overflow: hidden; }
+.section-heading { display: flex; align-items: center; justify-content: space-between; padding: 22px 24px 19px; }
+.section-heading h2 { margin-bottom: 4px; font-size: 16px; font-weight: 700; }
+.section-heading p { margin-bottom: 0; color: #8792a2; font-size: 12px; }
+.section-badge { padding: 6px 10px; border-radius: 20px; background: #f1f5f9; color: #64748b; font-size: 11px; font-weight: 600; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; text-align: left; }
+thead { background: #f8fafc; }
+th { padding: 11px 24px; color: #8290a3; font-size: 10px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; }
+td { padding: 14px 24px; border-top: 1px solid #edf0f4; color: #4b586b; font-size: 13px; }
+th.numeric, td.numeric { text-align: right; }
+.currency-code { display: inline-block; min-width: 44px; color: #344054; font-size: 11px; font-weight: 700; letter-spacing: .5px; }
+td.salary { color: #182230; font-weight: 600; font-variant-numeric: tabular-nums; }
+.table-note { margin: 0; padding: 13px 24px 16px; border-top: 1px solid #edf0f4; color: #8a95a5; font-size: 11px; }
+.message { padding: 24px; color: #667085; }
+.message.error { border: 1px solid #fecaca; border-radius: 10px; background: #fff7f7; color: #b42318; }
+.empty-state { padding: 20px 24px; color: #667085; font-size: 13px; }
+.placeholder { padding: 28px; }
+.placeholder h1 { font-size: 24px; }
+.placeholder p { margin-bottom: 0; color: #667085; }
+@media (max-width: 600px) {
+  .site-header { height: 64px; padding: 0 18px; }
+  nav { gap: 20px; }
+  nav a { font-size: 13px; }
+  .main-content { padding: 34px 18px 50px; }
+  h1 { font-size: 25px; }
+  .headcount-card { width: 100%; }
+  .section-heading { padding: 18px; }
+  th, td { padding-right: 18px; padding-left: 18px; white-space: nowrap; }
+  .table-note { padding-right: 18px; padding-left: 18px; line-height: 1.5; }
+}
