@@ -31,3 +31,9 @@ uvicorn app.main:app --reload
 ```
 
 The API is available at `http://127.0.0.1:8000`, with interactive API documentation at `/docs`. Check `http://127.0.0.1:8000/health` to verify the API and SQLite connection. The default database is created at `backend/data/acme_salary_management.db`. Set `DATABASE_PATH` to use another SQLite file; relative paths resolve from `backend/`, and absolute paths are also supported.
+
+To install pytest and run the backend tests from `backend/`, use `python -m pip install -r requirements-dev.txt` followed by `python -m pytest`.
+
+## Database
+
+SQLite is used for local development. The employees table is initialized when the backend starts. PostgreSQL is the planned deployment database.
