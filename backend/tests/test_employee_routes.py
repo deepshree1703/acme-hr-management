@@ -5,6 +5,7 @@ import asyncio
 import pytest
 from httpx2 import ASGITransport, AsyncClient, Response
 
+from app.constants import EMPLOYMENT_STATUSES, SUPPORTED_CURRENCIES
 from app.db_schema import init_db
 from app.database import connect
 from app.main import app
@@ -163,6 +164,43 @@ def test_get_missing_employee_returns_not_found(api_transport: ASGITransport) ->
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Employee not found"
+
+
+def test_employee_filter_options_return_distinct_values_and_supported_options(
+    api_transport: ASGITransport,
+) -> None:
+    _seed_employees(
+        [
+            {
+                **valid_employee_payload(),
+                "employee_id": "EMP-00001",
+                "country": "Canada",
+                "department": "Engineering",
+            },
+            {
+                **valid_employee_payload(),
+                "employee_id": "EMP-00002",
+                "country": "Canada",
+                "department": "Finance",
+            },
+            {
+                **valid_employee_payload(),
+                "employee_id": "EMP-00003",
+                "country": "India",
+                "department": "Engineering",
+            },
+        ]
+    )
+
+    response = _request(api_transport, "GET", "/employees/filters")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "countries": ["Canada", "India"],
+        "departments": ["Engineering", "Finance"],
+        "employment_statuses": list(EMPLOYMENT_STATUSES),
+        "currencies": list(SUPPORTED_CURRENCIES),
+    }
 
 
 def test_update_employee_returns_replacement_record(api_transport: ASGITransport) -> None:

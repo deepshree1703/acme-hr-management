@@ -13,11 +13,13 @@ from app.repository import (
     create_employee as repository_create_employee,
     delete_employee as repository_delete_employee,
     get_employee_by_id as repository_get_employee_by_id,
+    get_employee_filter_options as repository_get_employee_filter_options,
     list_employees as repository_list_employees,
     update_employee as repository_update_employee,
 )
 from app.schemas import (
     EmployeeCreate,
+    EmployeeFilterOptions,
     EmployeeListResponse,
     EmployeeRead,
     EmployeeUpdate,
@@ -52,6 +54,14 @@ def list_employees(
         page_size=PAGE_SIZE,
         total_pages=math.ceil(total / PAGE_SIZE),
     )
+
+
+@router.get("/filters", response_model=EmployeeFilterOptions)
+def employee_filter_options(
+    connection: sqlite3.Connection = Depends(get_connection),
+) -> EmployeeFilterOptions:
+    """Return options used by the employee list filters."""
+    return repository_get_employee_filter_options(connection)
 
 
 @router.post("", response_model=EmployeeRead, status_code=status.HTTP_201_CREATED)
