@@ -69,3 +69,13 @@ class EmployeeUpdate(EmployeeFields):
 
 class EmployeeRead(EmployeeCreate):
     """Validated employee data returned by the API."""
+
+
+class EmployeeListResponse(BaseModel):
+    """Paginated employee list and match metadata."""
+
+    items: list[EmployeeRead]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
