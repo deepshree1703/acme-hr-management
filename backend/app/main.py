@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException
 
 from app.database import check_database
 from app.db_schema import init_db
+from app.routers.dashboard import router as dashboard_router
 from app.routers.employees import router as employees_router
 
 
@@ -24,6 +25,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.include_router(employees_router)
+app.include_router(dashboard_router)
 
 
 @app.get("/health", tags=["health"])

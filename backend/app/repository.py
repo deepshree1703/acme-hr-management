@@ -3,7 +3,12 @@
 import sqlite3
 
 from app.constants import PAGE_SIZE
-from app.schemas import EmployeeCreate, EmployeeRead, EmployeeUpdate
+from app.schemas import (
+    CurrencySalarySummary,
+    EmployeeCreate,
+    EmployeeRead,
+    EmployeeUpdate,
+)
 
 _EMPLOYEE_SELECT = """
 SELECT
@@ -172,3 +177,34 @@ def list_employees(
     ).fetchall()
 
     return [EmployeeRead.model_validate(dict(row)) for row in rows], total
+
+
+def get_salary_dashboard(
+    connection: sqlite3.Connection,
+) -> tuple[list[CurrencySalarySummary], int]:
+    """Return per-currency salary aggregates and the overall employee count."""
+    rows = connection.execute(
+        """
+        SELECT
+            currency,
+            COUNT(*) AS headcount,
+            ROUND(AVG(annual_gross_base_salary), 2)
+                AS average_annual_gross_base_salary,
+            (SELECT COUNT(*) FROM employees) AS total_headcount
+        FROM employees
+        GROUP BY currency
+        ORDER BY currency
+        """
+    ).fetchall()
+    summaries = [
+        CurrencySalarySummary(
+            currency=row["currency"],
+            headcount=row["headcount"],
+            average_annual_gross_base_salary=row[
+                "average_annual_gross_base_salary"
+            ],
+        )
+        for row in rows
+    ]
+    total_headcount = rows[0]["total_headcount"] if rows else 0
+    return summaries, total_headcount
