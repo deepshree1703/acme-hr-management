@@ -6,7 +6,10 @@ import pytest
 from httpx2 import ASGITransport, AsyncClient, Response
 
 from app.db_schema import init_db
+from app.database import connect
 from app.main import app
+from app.repository import create_employee as repository_create_employee
+from app.schemas import EmployeeCreate
 
 
 @pytest.fixture
@@ -21,13 +24,14 @@ def _request(
     method: str,
     path: str,
     payload: dict[str, object] | None = None,
+    params: dict[str, str | int] | None = None,
 ) -> Response:
     async def send_request() -> Response:
         async with AsyncClient(
             transport=transport,
             base_url="http://testserver",
         ) as client:
-            return await client.request(method, path, json=payload)
+            return await client.request(method, path, json=payload, params=params)
 
     return asyncio.run(send_request())
 
@@ -48,6 +52,58 @@ def valid_update_payload() -> dict[str, object]:
     payload = valid_employee_payload()
     del payload["employee_id"]
     return payload
+
+
+def _seed_employees(
+    employees: list[dict[str, object]],
+) -> None:
+    connection = connect()
+    try:
+        for employee in employees:
+            repository_create_employee(connection, EmployeeCreate(**employee))
+    finally:
+        connection.close()
+
+
+def _list_filter_employees() -> list[dict[str, object]]:
+    return [
+        {
+            **valid_employee_payload(),
+            "employee_id": "EMP-00001",
+            "name": "Alice Smith",
+            "department": "People",
+            "country": "Canada",
+            "employment_status": "Active",
+            "currency": "CAD",
+        },
+        {
+            **valid_employee_payload(),
+            "employee_id": "EMP-00002",
+            "name": "Alicia Morgan",
+            "department": "People",
+            "country": "Canada",
+            "employment_status": "Inactive",
+            "currency": "CAD",
+        },
+        {
+            **valid_employee_payload(),
+            "employee_id": "EMP-00003",
+            "name": "Bob Smith",
+            "department": "Engineering",
+            "country": "India",
+            "employment_status": "Active",
+            "currency": "INR",
+        },
+        {
+            **valid_employee_payload(),
+            "employee_id": "EMP-00004",
+            "name": "Charlie Lee",
+            "department": "Engineering",
+            "country": "Canada",
+            "employment_status": "Active",
+            "currency": "CAD",
+        },
+    ]
 
 
 def test_create_employee_returns_created_record(api_transport: ASGITransport) -> None:
@@ -195,3 +251,194 @@ def test_delete_missing_employee_returns_not_found(
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Employee not found"
+
+
+def test_list_employees_uses_fixed_size_pages_and_reports_totals(
+    api_transport: ASGITransport,
+) -> None:
+    employees = []
+    for index in range(1, 46):
+        employee = valid_employee_payload()
+        employee["employee_id"] = f"EMP-{index:05d}"
+        employee["name"] = f"Employee {index:02d}"
+        employees.append(employee)
+    _seed_employees(employees)
+
+    expected_page_lengths = (20, 20, 5)
+    for page, expected_length in enumerate(expected_page_lengths, start=1):
+        response = _request(
+            api_transport,
+            "GET",
+            "/employees",
+            params={"page": page, "page_size": 1},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["items"]) == expected_length
+        assert data["total"] == 45
+        assert data["page"] == page
+        assert data["page_size"] == 20
+        assert data["total_pages"] == 3
+        assert data["items"] == sorted(data["items"], key=lambda item: item["employee_id"])
+
+    beyond_last_page = _request(
+        api_transport,
+        "GET",
+        "/employees",
+        params={"page": 4},
+    ).json()
+    assert beyond_last_page["items"] == []
+    assert beyond_last_page["total"] == 45
+    assert beyond_last_page["total_pages"] == 3
+
+
+def test_list_employees_searches_name_case_insensitively(api_transport: ASGITransport) -> None:
+    _seed_employees(_list_filter_employees())
+
+    response = _request(
+        api_transport,
+        "GET",
+        "/employees",
+        params={"search": "aLi"},
+    )
+    data = response.json()
+
+    assert response.status_code == 200
+    assert data["total"] == 2
+    assert [item["employee_id"] for item in data["items"]] == [
+        "EMP-00001",
+        "EMP-00002",
+    ]
+
+
+def test_list_employees_searches_by_employee_id(api_transport: ASGITransport) -> None:
+    _seed_employees(_list_filter_employees())
+
+    response = _request(
+        api_transport,
+        "GET",
+        "/employees",
+        params={"search": "EMP-00003"},
+    )
+    data = response.json()
+
+    assert response.status_code == 200
+    assert data["total"] == 1
+    assert [item["employee_id"] for item in data["items"]] == ["EMP-00003"]
+
+
+def test_list_employees_searches_employee_id_by_case_insensitive_prefix(
+    api_transport: ASGITransport,
+) -> None:
+    employees = []
+    for index in range(1, 21):
+        employee = valid_employee_payload()
+        employee["employee_id"] = f"EMP-{index:05d}"
+        employee["name"] = f"Person {index}"
+        employees.append(employee)
+    _seed_employees(employees)
+
+    response = _request(
+        api_transport,
+        "GET",
+        "/employees",
+        params={"search": "emp-0001"},
+    )
+    data = response.json()
+
+    assert response.status_code == 200
+    assert data["total"] == 10
+    assert [item["employee_id"] for item in data["items"]] == [
+        f"EMP-{index:05d}" for index in range(10, 20)
+    ]
+
+    unrelated_prefix = _request(
+        api_transport,
+        "GET",
+        "/employees",
+        params={"search": "XYZ-"},
+    ).json()
+    assert unrelated_prefix["items"] == []
+    assert unrelated_prefix["total"] == 0
+
+
+@pytest.mark.parametrize(
+    ("filter_params", "expected_ids"),
+    [
+        ({"country": "Canada"}, ["EMP-00001", "EMP-00002", "EMP-00004"]),
+        ({"department": "Engineering"}, ["EMP-00003", "EMP-00004"]),
+        ({"employment_status": "Active"}, ["EMP-00001", "EMP-00003", "EMP-00004"]),
+    ],
+)
+def test_list_employees_applies_each_exact_filter(
+    api_transport: ASGITransport,
+    filter_params: dict[str, str],
+    expected_ids: list[str],
+) -> None:
+    _seed_employees(_list_filter_employees())
+
+    response = _request(
+        api_transport,
+        "GET",
+        "/employees",
+        params=filter_params,
+    )
+    data = response.json()
+
+    assert response.status_code == 200
+    assert data["total"] == len(expected_ids)
+    assert [item["employee_id"] for item in data["items"]] == expected_ids
+
+
+def test_list_employees_combines_filters_with_and(api_transport: ASGITransport) -> None:
+    _seed_employees(_list_filter_employees())
+
+    response = _request(
+        api_transport,
+        "GET",
+        "/employees",
+        params={
+            "search": "alice",
+            "country": "Canada",
+            "department": "People",
+            "employment_status": "Active",
+        },
+    )
+    data = response.json()
+
+    assert response.status_code == 200
+    assert data["total"] == 1
+    assert [item["employee_id"] for item in data["items"]] == ["EMP-00001"]
+
+
+def test_list_employees_returns_empty_results_with_zero_totals(
+    api_transport: ASGITransport,
+) -> None:
+    response = _request(
+        api_transport,
+        "GET",
+        "/employees",
+        params={"country": "Nowhere"},
+    )
+    data = response.json()
+
+    assert response.status_code == 200
+    assert data == {
+        "items": [],
+        "total": 0,
+        "page": 1,
+        "page_size": 20,
+        "total_pages": 0,
+    }
+
+
+@pytest.mark.parametrize(
+    "query", [{"employment_status": "On leave"}, {"page": 0}]
+)
+def test_list_employees_rejects_invalid_query_parameters(
+    api_transport: ASGITransport, query: dict[str, str | int]
+) -> None:
+    response = _request(api_transport, "GET", "/employees", params=query)
+
+    assert response.status_code == 422
