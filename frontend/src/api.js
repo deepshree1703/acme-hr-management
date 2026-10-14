@@ -1,10 +1,11 @@
 const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:8000").replace(/\/$/, "");
 
-async function request(path) {
+async function request(path, options = {}) {
   let response;
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
-      headers: { Accept: "application/json" },
+      ...options,
+      headers: { Accept: "application/json", ...options.headers },
     });
   } catch {
     throw new Error("Could not reach the API. Check that the backend is running.");
@@ -27,8 +28,13 @@ async function request(path) {
       : typeof detail === "string"
         ? detail
         : `Request failed with status ${response.status}`;
-    throw new Error(message);
+    const error = new Error(message);
+    error.status = response.status;
+    error.detail = detail;
+    throw error;
   }
+
+  if (response.status === 204) return null;
 
   if (body === undefined) {
     throw new Error("The API returned an empty response.");
@@ -55,4 +61,24 @@ export function getEmployees(params) {
     }
   }
   return request(`/employees?${query.toString()}`);
+}
+
+export function createEmployee(employee) {
+  return request("/employees", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(employee),
+  });
+}
+
+export function updateEmployee(employeeId, employee) {
+  return request(`/employees/${encodeURIComponent(employeeId)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(employee),
+  });
+}
+
+export function deleteEmployee(employeeId) {
+  return request(`/employees/${encodeURIComponent(employeeId)}`, { method: "DELETE" });
 }

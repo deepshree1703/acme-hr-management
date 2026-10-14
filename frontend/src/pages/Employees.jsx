@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { getEmployeeFilterOptions, getEmployees } from "../api.js";
+import {
+  createEmployee,
+  deleteEmployee,
+  getEmployeeFilterOptions,
+  getEmployees,
+  updateEmployee,
+} from "../api.js";
 
 function readPage(value) {
   const parsed = Number.parseInt(value || "1", 10);
@@ -25,6 +31,163 @@ const FILTERS = [
   ["employment_status", "Employment status", "employment_statuses"],
 ];
 
+const EMPTY_EMPLOYEE = {
+  employee_id: "",
+  name: "",
+  department: "",
+  country: "",
+  employment_status: "Active",
+  annual_gross_base_salary: "",
+  currency: "USD",
+};
+
+const EMPLOYEE_FIELDS = [
+  ["employee_id", "Employee ID"],
+  ["name", "Name"],
+  ["department", "Department"],
+  ["country", "Country"],
+  ["employment_status", "Employment status"],
+  ["annual_gross_base_salary", "Annual salary"],
+  ["currency", "Currency"],
+];
+
+function EmployeeForm({ employee, filters, onClose, onSaved }) {
+  const editing = Boolean(employee);
+  const [values, setValues] = useState(() => employee
+    ? { ...employee, annual_gross_base_salary: String(employee.annual_gross_base_salary) }
+    : { ...EMPTY_EMPLOYEE });
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [formError, setFormError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  function setValue(name, value) {
+    setValues((current) => ({ ...current, [name]: value }));
+    setFieldErrors((current) => ({ ...current, [name]: undefined }));
+    setFormError("");
+  }
+
+  async function submit(event) {
+    event.preventDefault();
+    const errors = {};
+    for (const [name, label] of EMPLOYEE_FIELDS) {
+      if (name === "employee_id" && editing) continue;
+      if (!String(values[name] ?? "").trim()) errors[name] = `${label} is required.`;
+    }
+    const salary = Number(values.annual_gross_base_salary);
+    if (values.annual_gross_base_salary !== "" && (!Number.isFinite(salary) || salary < 0)) {
+      errors.annual_gross_base_salary = "Enter a valid salary of zero or more.";
+    }
+    if (Object.keys(errors).length) {
+      setFieldErrors(errors);
+      return;
+    }
+
+    const payload = {
+      ...(editing ? {} : { employee_id: values.employee_id.trim() }),
+      name: values.name.trim(),
+      department: values.department.trim(),
+      country: values.country.trim(),
+      employment_status: values.employment_status,
+      annual_gross_base_salary: salary,
+      currency: values.currency,
+    };
+    setSaving(true);
+    setFieldErrors({});
+    setFormError("");
+    try {
+      if (editing) await updateEmployee(employee.employee_id, payload);
+      else await createEmployee(payload);
+      onSaved();
+    } catch (error) {
+      if (error.status === 422 && Array.isArray(error.detail)) {
+        const mapped = {};
+        const messages = [];
+        for (const issue of error.detail) {
+          const location = issue.loc || [];
+          const field = location[location.length - 1];
+          if (EMPLOYEE_FIELDS.some(([name]) => name === field)) {
+            mapped[field] = issue.msg;
+          } else {
+            messages.push(issue.msg);
+          }
+        }
+        setFieldErrors(mapped);
+        if (messages.length) setFormError(messages.join("; "));
+      } else if (error.status === 409) {
+        setFieldErrors({ employee_id: error.message });
+      } else {
+        setFormError(error.message || "Unable to save this employee.");
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function renderField(name, label) {
+    const common = {
+      id: `employee-${name}`,
+      value: values[name] ?? "",
+      onChange: (event) => setValue(name, event.target.value),
+      disabled: saving || (name === "employee_id" && editing),
+      "aria-invalid": Boolean(fieldErrors[name]),
+      "aria-describedby": fieldErrors[name] ? `employee-${name}-error` : undefined,
+    };
+    let control;
+    if (name === "employment_status" || name === "currency") {
+      const options = name === "currency" ? filters?.currencies : filters?.employment_statuses;
+      control = <select {...common} required>
+        {(options || []).map((option) => <option value={option} key={option}>{option}</option>)}
+      </select>;
+    } else if (name === "department" || name === "country") {
+      const listId = `employee-${name}-options`;
+      const options = name === "department" ? filters?.departments : filters?.countries;
+      control = <>
+        <input {...common} list={listId} required />
+        <datalist id={listId}>{(options || []).map((option) => <option value={option} key={option} />)}</datalist>
+      </>;
+    } else {
+      control = <input
+        {...common}
+        required
+        type={name === "annual_gross_base_salary" ? "number" : "text"}
+        min={name === "annual_gross_base_salary" ? "0" : undefined}
+        step={name === "annual_gross_base_salary" ? "any" : undefined}
+        autoComplete={name === "name" ? "name" : "off"}
+        placeholder={name === "employee_id" ? "EMP-00001" : undefined}
+      />;
+    }
+    return <label className="employee-form-field" htmlFor={`employee-${name}`} key={name}>
+      <span>{label}</span>
+      {control}
+      {fieldErrors[name] && <small className="field-error" id={`employee-${name}-error`}>{fieldErrors[name]}</small>}
+    </label>;
+  }
+
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
+    if (event.target === event.currentTarget && !saving) onClose();
+  }}>
+    <section className="employee-modal" role="dialog" aria-modal="true" aria-labelledby="employee-form-title">
+      <div className="modal-heading">
+        <div>
+          <p className="eyebrow">Employee record</p>
+          <h2 id="employee-form-title">{editing ? "Edit employee" : "Add employee"}</h2>
+        </div>
+        <button className="modal-close" type="button" onClick={onClose} disabled={saving} aria-label="Close">×</button>
+      </div>
+      {formError && <p className="form-error" role="alert">{formError}</p>}
+      <form onSubmit={submit} noValidate>
+        <div className="employee-form-grid">
+          {EMPLOYEE_FIELDS.map(([name, label]) => renderField(name, label))}
+        </div>
+        <div className="form-actions">
+          <button type="button" className="button-secondary" onClick={onClose} disabled={saving}>Cancel</button>
+          <button type="submit" className="button-primary" disabled={saving}>{saving ? "Saving…" : editing ? "Save changes" : "Add employee"}</button>
+        </div>
+      </form>
+    </section>
+  </div>;
+}
+
 export default function Employees() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryString = searchParams.toString();
@@ -45,6 +208,10 @@ export default function Employees() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [formEmployee, setFormEmployee] = useState(undefined);
+  const [mutationError, setMutationError] = useState("");
+  const [deletingId, setDeletingId] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
   const requestSequence = useRef(0);
 
   // Keep the input responsive while committing the search to the URL after typing pauses.
@@ -88,7 +255,37 @@ export default function Employees() {
         if (active && sequence === requestSequence.current) setLoading(false);
       });
     return () => { active = false; };
-  }, [urlState]);
+  }, [urlState, refreshKey]);
+
+  function finishSave() {
+    setFormEmployee(undefined);
+    setMutationError("");
+    setRefreshKey((value) => value + 1);
+  }
+
+  async function removeEmployee(employee) {
+    const confirmed = window.confirm(`Delete ${employee.name} (${employee.employee_id})? This cannot be undone.`);
+    if (!confirmed) return;
+    setMutationError("");
+    setDeletingId(employee.employee_id);
+    try {
+      await deleteEmployee(employee.employee_id);
+      const newTotalPages = Math.ceil(Math.max(0, (result?.total || 0) - 1) / (result?.page_size || 20));
+      if (urlState.page > newTotalPages && urlState.page > 1) {
+        const next = new URLSearchParams(queryString);
+        const lastPage = Math.max(1, newTotalPages);
+        if (lastPage === 1) next.delete("page");
+        else next.set("page", String(lastPage));
+        setSearchParams(next);
+      } else {
+        setRefreshKey((value) => value + 1);
+      }
+    } catch (err) {
+      setMutationError(err.message || "Unable to delete this employee.");
+    } finally {
+      setDeletingId("");
+    }
+  }
 
   function updateFilter(name, value) {
     const next = new URLSearchParams(queryString);
@@ -113,9 +310,13 @@ export default function Employees() {
           <h1>Employees</h1>
           <p className="page-subtitle">Search and filter your employee records.</p>
         </div>
+        <button className="button-primary add-employee-button" type="button" onClick={() => setFormEmployee(null)} disabled={!filters}>
+          + Add employee
+        </button>
       </div>
 
       <section className="panel employee-panel">
+        {mutationError && <p className="mutation-error" role="alert">{mutationError}</p>}
         <div className="employee-toolbar">
           <label className="search-field">
             <span>Search employees</span>
@@ -160,7 +361,7 @@ export default function Employees() {
             <table className="employee-table">
               <thead>
                 <tr>
-                  <th>Employee ID</th><th>Name</th><th>Department</th><th>Country</th><th>Status</th><th className="numeric">Annual salary</th>
+                  <th>Employee ID</th><th>Name</th><th>Department</th><th>Country</th><th>Status</th><th className="numeric">Annual salary</th><th className="actions-heading">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -172,6 +373,12 @@ export default function Employees() {
                     <td>{employee.country}</td>
                     <td><span className={`status-pill ${employee.employment_status.toLowerCase()}`}>{employee.employment_status}</span></td>
                     <td className="numeric salary">{formatSalary(employee.annual_gross_base_salary, employee.currency)} <span className="salary-currency">{employee.currency}</span></td>
+                    <td className="row-actions">
+                      <button type="button" onClick={() => setFormEmployee(employee)}>Edit</button>
+                      <button type="button" className="delete-action" onClick={() => removeEmployee(employee)} disabled={deletingId === employee.employee_id}>
+                        {deletingId === employee.employee_id ? "Deleting…" : "Delete"}
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -190,6 +397,14 @@ export default function Employees() {
           </div>
         )}
       </section>
+      {formEmployee !== undefined && filters && (
+        <EmployeeForm
+          employee={formEmployee}
+          filters={filters}
+          onClose={() => setFormEmployee(undefined)}
+          onSaved={finishSave}
+        />
+      )}
     </>
   );
 }
