@@ -40,6 +40,19 @@ python -m scripts.seed
 
 To install pytest and run the backend tests from `backend/`, use `python -m pip install -r requirements-dev.txt` followed by `python -m pytest`.
 
+## Frontend setup
+
+The frontend uses React, JavaScript with JSX, and Vite. Start the backend first, then run the frontend in another terminal:
+
+```bash
+cd frontend
+npm install
+cp .env.example .env
+npm run dev
+```
+
+Open the local URL printed by Vite (normally `http://localhost:5173`). The API URL defaults to `http://localhost:8000`; set `VITE_API_URL` in `frontend/.env` to point to another backend. Restart Vite after changing environment variables. The dashboard shows headcount and average salary by currency; averages remain in their own currencies and are not combined.
+
 ## Database
 
 SQLite is used for local development. The employees table is initialized when the backend starts. PostgreSQL is the planned deployment database.
