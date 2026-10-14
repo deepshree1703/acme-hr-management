@@ -1,0 +1,1 @@
+"""ACME salary management API."""
