@@ -2,10 +2,11 @@
 
 import sqlite3
 
-from app.constants import PAGE_SIZE
+from app.constants import EMPLOYMENT_STATUSES, PAGE_SIZE, SUPPORTED_CURRENCIES
 from app.schemas import (
     CurrencySalarySummary,
     EmployeeCreate,
+    EmployeeFilterOptions,
     EmployeeRead,
     EmployeeUpdate,
 )
@@ -208,3 +209,21 @@ def get_salary_dashboard(
     ]
     total_headcount = rows[0]["total_headcount"] if rows else 0
     return summaries, total_headcount
+
+
+def get_employee_filter_options(
+    connection: sqlite3.Connection,
+) -> EmployeeFilterOptions:
+    """Return distinct database values and supported statuses and currencies."""
+    countries = connection.execute(
+        "SELECT DISTINCT country FROM employees ORDER BY country"
+    ).fetchall()
+    departments = connection.execute(
+        "SELECT DISTINCT department FROM employees ORDER BY department"
+    ).fetchall()
+    return EmployeeFilterOptions(
+        countries=[row["country"] for row in countries],
+        departments=[row["department"] for row in departments],
+        employment_statuses=list(EMPLOYMENT_STATUSES),
+        currencies=list(SUPPORTED_CURRENCIES),
+    )

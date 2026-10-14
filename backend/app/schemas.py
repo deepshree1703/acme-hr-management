@@ -94,3 +94,12 @@ class SalaryDashboardResponse(BaseModel):
 
     currencies: list[CurrencySalarySummary]
     total_headcount: int
+
+
+class EmployeeFilterOptions(BaseModel):
+    """Distinct employee filter values and the supported status/currency values."""
+
+    countries: list[str]
+    departments: list[str]
+    employment_statuses: list[str]
+    currencies: list[str]
