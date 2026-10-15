@@ -12,6 +12,7 @@ from app.main import app
 def test_cors_origins_default_to_react_dev_server(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Verify that cors origins default to react dev server."""
     monkeypatch.delenv("CORS_ORIGINS", raising=False)
 
     assert get_settings().cors_origins == ("http://localhost:5173",)
@@ -20,6 +21,7 @@ def test_cors_origins_default_to_react_dev_server(
 def test_cors_origins_can_be_configured_from_environment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Verify that cors origins can be configured from environment."""
     monkeypatch.setenv("CORS_ORIGINS", "https://app.example, http://localhost:5173 ")
 
     assert get_settings().cors_origins == (
@@ -29,7 +31,9 @@ def test_cors_origins_can_be_configured_from_environment(
 
 
 def test_cors_allows_react_dev_server_origin() -> None:
+    """Verify that cors allows react dev server origin."""
     async def send_preflight():
+        """Send a CORS preflight request to the test application."""
         async with AsyncClient(
             transport=ASGITransport(app=app),
             base_url="http://testserver",

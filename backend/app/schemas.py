@@ -29,6 +29,7 @@ class EmployeeFields(BaseModel):
     @field_validator("name", "department", "country")
     @classmethod
     def trim_nonblank_text(cls, value: str) -> str:
+        """Trim text fields and reject values that are blank after trimming."""
         value = value.strip()
         if not value:
             raise ValueError("This field must not be blank")
@@ -37,6 +38,7 @@ class EmployeeFields(BaseModel):
     @field_validator("employment_status")
     @classmethod
     def validate_employment_status(cls, value: str) -> str:
+        """Ensure the employment status is one of the supported values."""
         if value not in EMPLOYMENT_STATUSES:
             raise ValueError(f"Status must be one of: {', '.join(EMPLOYMENT_STATUSES)}")
         return value
@@ -44,6 +46,7 @@ class EmployeeFields(BaseModel):
     @field_validator("annual_gross_base_salary", mode="before")
     @classmethod
     def require_numeric_salary(cls, value: Any) -> Any:
+        """Validate that salary is finite, nonnegative, and has at most two decimals."""
         if isinstance(value, bool) or not isinstance(value, (int, float, Decimal)):
             raise ValueError("Salary must be a number")
         try:
@@ -63,6 +66,7 @@ class EmployeeFields(BaseModel):
     @field_validator("currency")
     @classmethod
     def validate_currency(cls, value: str) -> str:
+        """Ensure the currency is supported."""
         if value not in SUPPORTED_CURRENCIES:
             raise ValueError(f"Currency must be one of: {', '.join(SUPPORTED_CURRENCIES)}")
         return value
@@ -84,6 +88,7 @@ class EmployeeRead(EmployeeFields):
     @field_validator("employee_id")
     @classmethod
     def validate_employee_id(cls, value: str) -> str:
+        """Ensure the employee ID matches the required format."""
         if re.fullmatch(EMPLOYEE_ID_PATTERN, value) is None:
             raise ValueError("Employee ID must match EMP-00001 format")
         return value

@@ -14,6 +14,7 @@ from scripts.seed import seed_employees
 def test_seed_is_repeatable_with_a_small_employee_count(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    """Verify that seed is repeatable with a small employee count."""
     monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "seed-test.db"))
 
     first_added, first_total = seed_employees(count=12, batch_size=5)
@@ -39,6 +40,7 @@ def test_seed_is_repeatable_with_a_small_employee_count(
 def test_seed_counts_batches_when_psycopg_executemany_returns_none(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Verify that seed counts batches when psycopg executemany returns none."""
     inserted: list[tuple[object, ...]] = []
     statements: list[str] = []
 
@@ -46,6 +48,7 @@ def test_seed_counts_batches_when_psycopg_executemany_returns_none(
         rowcount = 0
 
         def executemany(self, sql, rows):
+            """Record or execute a batch of SQL statements for the test double."""
             batch = list(rows)
             statements.append(sql)
             inserted.extend(batch)
@@ -54,16 +57,20 @@ def test_seed_counts_batches_when_psycopg_executemany_returns_none(
 
     class FakeTransaction:
         def __enter__(self):
+            """Enter the test connection context."""
             return self
 
         def __exit__(self, exc_type, exc_value, traceback):
+            """Exit the test connection context."""
             return False
 
     class FakePostgresConnection:
         def cursor(self):
+            """Return the cursor used by the test connection."""
             return FakeCursor()
 
         def execute(self, sql, parameters=()):
+            """Record or execute a SQL statement for the test double."""
             assert "SELECT COUNT(*) AS total_count" in sql
             return SimpleNamespace(
                 fetchone=lambda: {"total_count": len(inserted)},
@@ -71,9 +78,11 @@ def test_seed_counts_batches_when_psycopg_executemany_returns_none(
             )
 
         def transaction(self):
+            """Return the transaction context used by the test connection."""
             return FakeTransaction()
 
         def close(self):
+            """Mark the test connection as closed."""
             pass
 
     raw_connection = FakePostgresConnection()

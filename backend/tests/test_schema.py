@@ -13,6 +13,7 @@ from app.db_schema import init_db
 def test_connection_can_be_queried_and_closed_from_another_thread(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    """Verify that connection can be queried and closed from another thread."""
     monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "employees.db"))
 
     connection = connect()
@@ -25,6 +26,7 @@ def test_connection_can_be_queried_and_closed_from_another_thread(
 
 
 def _insert_employee(connection: sqlite3.Connection, **overrides: object) -> None:
+    """Insert one employee fixture into the test database."""
     employee = {
         "employee_id": "EMP-00001",
         "name": "Alex Example",
@@ -46,6 +48,7 @@ def _insert_employee(connection: sqlite3.Connection, **overrides: object) -> Non
 def test_init_db_creates_table_and_indexes_idempotently(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    """Verify that init db creates table and indexes idempotently."""
     monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "employees.db"))
 
     init_db()
@@ -82,6 +85,7 @@ def test_init_db_creates_table_and_indexes_idempotently(
 def test_init_db_uses_postgresql_constraints_and_types(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Verify that init db uses postgresql constraints and types."""
     from app import db_schema
 
     statements: list[str] = []
@@ -90,15 +94,19 @@ def test_init_db_uses_postgresql_constraints_and_types(
         dialect = "postgresql"
 
         def execute(self, sql, parameters=()):
+            """Record or execute a SQL statement for the test double."""
             statements.append(sql)
 
         def close(self):
+            """Mark the test connection as closed."""
             pass
 
         def __enter__(self):
+            """Enter the test connection context."""
             return self
 
         def __exit__(self, exc_type, exc_value, traceback):
+            """Exit the test connection context."""
             return False
 
     monkeypatch.setattr(db_schema, "connect", FakeConnection)
@@ -115,6 +123,7 @@ def test_init_db_uses_postgresql_constraints_and_types(
 def test_employee_constraints_reject_invalid_values(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    """Verify that employee constraints reject invalid values."""
     monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "employees.db"))
     init_db()
 

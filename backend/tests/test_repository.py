@@ -13,6 +13,7 @@ from app.schemas import EmployeeCreate
 def test_repository_queries_work_with_database_neutral_count_and_rounding(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    """Verify that repository queries work with database neutral count and rounding."""
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "repository.db"))
     init_db()

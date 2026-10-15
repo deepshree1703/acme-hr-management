@@ -19,6 +19,7 @@ SEED_COUNT = 12
 
 
 def _database_target(url: str) -> tuple[str, int | None, str]:
+    """Return the configured PostgreSQL integration test target."""
     parsed = urlsplit(url)
     port = parsed.port or (
         5432 if parsed.scheme in {"postgres", "postgresql"} else None

@@ -12,6 +12,7 @@ from app.config import ConfigurationError, get_settings
 def test_settings_use_local_database_when_database_url_is_unset(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    """Verify that settings use local database when database url is unset."""
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.delenv("VERCEL", raising=False)
     monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "local.db"))
@@ -26,6 +27,7 @@ def test_settings_use_local_database_when_database_url_is_unset(
 def test_settings_require_database_url_on_vercel(
     monkeypatch: pytest.MonkeyPatch, database_url: str | None
 ) -> None:
+    """Verify that settings require database url on vercel."""
     monkeypatch.setenv("VERCEL", "1")
     if database_url is None:
         monkeypatch.delenv("DATABASE_URL", raising=False)
@@ -40,6 +42,7 @@ def test_settings_require_database_url_on_vercel(
 
 
 def test_settings_load_postgresql_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify that settings load postgresql url."""
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@localhost/db")
 
     assert get_settings().database_url == "postgresql://user:pass@localhost/db"
@@ -48,6 +51,7 @@ def test_settings_load_postgresql_url(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_connect_uses_psycopg_dictionary_rows_and_qmark_adapter(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Verify that connect uses psycopg dictionary rows and qmark adapter."""
     events: list[object] = []
     cursor = SimpleNamespace(
         rowcount=2,
@@ -56,23 +60,29 @@ def test_connect_uses_psycopg_dictionary_rows_and_qmark_adapter(
 
     class Transaction:
         def __enter__(self):
+            """Enter the test connection context."""
             events.append("begin")
 
         def __exit__(self, exc_type, exc_value, traceback):
+            """Exit the test connection context."""
             events.append("rollback" if exc_type else "commit")
 
     class RawConnection:
         def execute(self, sql, parameters=()):
+            """Record or execute a SQL statement for the test double."""
             events.append((sql, parameters))
             return cursor
 
         def cursor(self):
+            """Return the cursor used by the test connection."""
             return cursor
 
         def transaction(self):
+            """Return the transaction context used by the test connection."""
             return Transaction()
 
         def close(self):
+            """Mark the test connection as closed."""
             events.append("close")
 
     raw_connection = RawConnection()
@@ -80,6 +90,7 @@ def test_connect_uses_psycopg_dictionary_rows_and_qmark_adapter(
     calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
 
     def fake_connect(*args, **kwargs):
+        """Return the fake connection used to test database setup."""
         calls.append((args, kwargs))
         return raw_connection
 
@@ -122,6 +133,7 @@ def test_connect_uses_psycopg_dictionary_rows_and_qmark_adapter(
 def test_connect_keeps_local_sqlite_path_when_database_url_is_unset(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    """Verify that connect keeps local sqlite path when database url is unset."""
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.delenv("VERCEL", raising=False)
     monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "local.db"))
