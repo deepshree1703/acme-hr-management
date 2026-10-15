@@ -25,7 +25,21 @@ WHERE employee_id = ?
 
 
 class DuplicateEmployeeError(Exception):
-    """Raised when an employee ID is already present in the database."""
+    """Raised when an employee ID cannot be generated after retries."""
+
+
+def _next_employee_id(connection: DatabaseConnection) -> str:
+    row = connection.execute(
+        """SELECT MAX(CAST(SUBSTR(employee_id, 5) AS INTEGER)) AS highest_id
+           FROM employees"""
+    ).fetchone()
+    highest = row["highest_id"]
+    return f"EMP-{(highest or 0) + 1:05d}"
+
+
+def get_next_employee_id(connection: DatabaseConnection) -> str:
+    """Return the next ID preview based on the highest numeric ID part."""
+    return _next_employee_id(connection)
 
 
 def create_employee(
@@ -33,35 +47,36 @@ def create_employee(
 ) -> EmployeeRead:
     """Insert an employee and return the validated record."""
     with connection:
-        cursor = connection.execute(
-            """
-            INSERT INTO employees (
-                employee_id,
-                name,
-                department,
-                country,
-                employment_status,
-                annual_gross_base_salary,
-                currency
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(employee_id) DO NOTHING
-            """,
-            (
-                employee.employee_id,
-                employee.name,
-                employee.department,
-                employee.country,
-                employee.employment_status,
-                employee.annual_gross_base_salary,
-                employee.currency,
-            ),
-        )
-        if cursor.rowcount == 0:
-            raise DuplicateEmployeeError(
-                f"Employee ID {employee.employee_id} already exists"
+        for attempt in range(3):
+            employee_id = _next_employee_id(connection)
+            cursor = connection.execute(
+                """
+                INSERT INTO employees (
+                    employee_id,
+                    name,
+                    department,
+                    country,
+                    employment_status,
+                    annual_gross_base_salary,
+                    currency
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(employee_id) DO NOTHING
+                """,
+                (
+                    employee_id,
+                    employee.name,
+                    employee.department,
+                    employee.country,
+                    employee.employment_status,
+                    employee.annual_gross_base_salary,
+                    employee.currency,
+                ),
             )
-
-    return EmployeeRead.model_validate(employee.model_dump())
+            if cursor.rowcount:
+                return EmployeeRead.model_validate(
+                    employee.model_dump() | {"employee_id": employee_id}
+                )
+        raise DuplicateEmployeeError("Could not generate a unique employee ID")
 
 
 def get_employee_by_id(

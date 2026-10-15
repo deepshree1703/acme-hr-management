@@ -1,6 +1,10 @@
 """Database schema initialization."""
 
-from app.constants import EMPLOYMENT_STATUSES, SUPPORTED_CURRENCIES
+from app.constants import (
+    EMPLOYMENT_STATUSES,
+    MAX_ANNUAL_GROSS_BASE_SALARY,
+    SUPPORTED_CURRENCIES,
+)
 from app.database import connect
 
 
@@ -13,9 +17,10 @@ def init_db() -> None:
     try:
         with connection:
             employee_id_check = (
-                "employee_id ~ '^EMP-[0-9]{5}$'"
+                "employee_id ~ '^EMP-[0-9]{5,}$'"
                 if connection.dialect == "postgresql"
-                else "employee_id GLOB 'EMP-[0-9][0-9][0-9][0-9][0-9]'"
+                else "length(employee_id) >= 9 AND substr(employee_id, 1, 4) = 'EMP-' "
+                "AND substr(employee_id, 5) NOT GLOB '*[^0-9]*'"
             )
             salary_type = (
                 "DOUBLE PRECISION" if connection.dialect == "postgresql" else "REAL"
@@ -30,7 +35,8 @@ def init_db() -> None:
                     employment_status TEXT NOT NULL
                         CHECK (employment_status IN ({allowed_statuses})),
                     annual_gross_base_salary {salary_type} NOT NULL
-                        CHECK (annual_gross_base_salary >= 0),
+                        CHECK (annual_gross_base_salary >= 0 AND
+                            annual_gross_base_salary <= {MAX_ANNUAL_GROSS_BASE_SALARY}),
                     currency TEXT NOT NULL
                         CHECK (currency IN ({allowed_currencies}))
                 )

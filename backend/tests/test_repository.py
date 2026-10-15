@@ -21,12 +21,11 @@ def test_repository_queries_work_with_database_neutral_count_and_rounding(
         create_employee(
             connection,
             EmployeeCreate(
-                employee_id="EMP-00001",
                 name="Alex Example",
                 department="Operations",
                 country="India",
                 employment_status="Active",
-                annual_gross_base_salary=60000.126,
+                annual_gross_base_salary=60000.13,
                 currency="INR",
             ),
         )

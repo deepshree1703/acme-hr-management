@@ -1,11 +1,17 @@
 """Pydantic models for employee data validation."""
 
 import re
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.constants import EMPLOYMENT_STATUSES, SUPPORTED_CURRENCIES
+from app.constants import (
+    EMPLOYEE_ID_PATTERN,
+    EMPLOYMENT_STATUSES,
+    MAX_ANNUAL_GROSS_BASE_SALARY,
+    SUPPORTED_CURRENCIES,
+)
 
 
 class EmployeeFields(BaseModel):
@@ -17,7 +23,7 @@ class EmployeeFields(BaseModel):
     department: str
     country: str
     employment_status: str
-    annual_gross_base_salary: float = Field(ge=0, allow_inf_nan=False)
+    annual_gross_base_salary: float = Field(allow_inf_nan=False)
     currency: str
 
     @field_validator("name", "department", "country")
@@ -38,8 +44,20 @@ class EmployeeFields(BaseModel):
     @field_validator("annual_gross_base_salary", mode="before")
     @classmethod
     def require_numeric_salary(cls, value: Any) -> Any:
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
+        if isinstance(value, bool) or not isinstance(value, (int, float, Decimal)):
             raise ValueError("Salary must be a number")
+        try:
+            salary = Decimal(str(value))
+        except InvalidOperation as exc:
+            raise ValueError("Salary must be a finite number") from exc
+        if not salary.is_finite():
+            raise ValueError("Salary must be a finite number")
+        if salary < 0:
+            raise ValueError("Salary must be at least 0")
+        if salary > Decimal(str(MAX_ANNUAL_GROSS_BASE_SALARY)):
+            raise ValueError("Salary must not exceed 9999999999.99")
+        if max(-salary.as_tuple().exponent, 0) > 2:
+            raise ValueError("Salary must have at most 2 decimal places")
         return value
 
     @field_validator("currency")
@@ -53,22 +71,22 @@ class EmployeeFields(BaseModel):
 class EmployeeCreate(EmployeeFields):
     """Validated employee data for creating a record."""
 
-    employee_id: str
-
-    @field_validator("employee_id")
-    @classmethod
-    def validate_employee_id(cls, value: str) -> str:
-        if re.fullmatch(r"EMP-\d{5}", value) is None:
-            raise ValueError("Employee ID must match EMP-00001 format")
-        return value
-
 
 class EmployeeUpdate(EmployeeFields):
     """Validated replacement employee data; employee_id cannot be changed."""
 
 
-class EmployeeRead(EmployeeCreate):
+class EmployeeRead(EmployeeFields):
     """Validated employee data returned by the API."""
+
+    employee_id: str
+
+    @field_validator("employee_id")
+    @classmethod
+    def validate_employee_id(cls, value: str) -> str:
+        if re.fullmatch(EMPLOYEE_ID_PATTERN, value) is None:
+            raise ValueError("Employee ID must match EMP-00001 format")
+        return value
 
 
 class EmployeeListResponse(BaseModel):

@@ -12,6 +12,7 @@ from app.repository import (
     delete_employee as repository_delete_employee,
     get_employee_by_id as repository_get_employee_by_id,
     get_employee_filter_options as repository_get_employee_filter_options,
+    get_next_employee_id as repository_get_next_employee_id,
     list_employees as repository_list_employees,
     update_employee as repository_update_employee,
 )
@@ -60,6 +61,14 @@ def employee_filter_options(
 ) -> EmployeeFilterOptions:
     """Return options used by the employee list filters."""
     return repository_get_employee_filter_options(connection)
+
+
+@router.get("/next-id")
+def next_employee_id(
+    connection: DatabaseConnection = Depends(get_connection),
+) -> dict[str, str]:
+    """Preview the ID that would be generated for the next employee."""
+    return {"employee_id": repository_get_next_employee_id(connection)}
 
 
 @router.post("", response_model=EmployeeRead, status_code=status.HTTP_201_CREATED)
