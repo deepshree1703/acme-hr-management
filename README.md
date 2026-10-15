@@ -2,6 +2,12 @@
 
 Starter repository for the ACME Employee Salary Management project.
 
+## Links
+
+- **Demo video:** [Watch the demo](https://drive.google.com/file/d/1dg4X7WrxJLlAXs0Nvxr4e0W8Ot7n6UT8/view?usp=sharing)
+- **Live application:** [Open the live application](https://acme-hr-management-one.vercel.app/)
+- **Requirements (1 page):** [docs/ACME_Employee_Salary_Management_Requirements.pdf](docs/ACME_Employee_Salary_Management_Requirements.pdf)
+
 ## Planned stack
 
 - **Backend:** FastAPI (Python)
@@ -70,7 +76,7 @@ From the repository root, set the URL for a disposable PostgreSQL database and r
 ```bash
 export TEST_DATABASE_URL='postgresql://user:password@host:5432/test_database'
 export CONFIRM_TEST_DATABASE_WRITES=YES
-./.venv/bin/python -m pytest -q backend/tests/test_postgres_integration.py
+backend/.venv/bin/python -m pytest -q backend/tests/test_postgres_integration.py
 ```
 
 Do not set `TEST_DATABASE_URL` or `CONFIRM_TEST_DATABASE_WRITES` in Vercel. Vercel uses the server-side `DATABASE_URL` setting for the application database.
