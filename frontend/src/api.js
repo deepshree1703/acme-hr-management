@@ -54,6 +54,10 @@ export function getEmployeeFilterOptions() {
   return request("/employees/filters");
 }
 
+export function getNextEmployeeId() {
+  return request("/employees/next-id");
+}
+
 export function getEmployees(params) {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
