@@ -5,8 +5,12 @@ import {
   deleteEmployee,
   getEmployeeFilterOptions,
   getEmployees,
+  getNextEmployeeId,
   updateEmployee,
 } from "../api.js";
+
+const MAX_SALARY = 9999999999.99;
+const SALARY_LIMIT_MESSAGE = "Salary can have at most 10 digits before the decimal and 2 after (maximum 9999999999.99).";
 
 function readPage(value) {
   const parsed = Number.parseInt(value || "1", 10);
@@ -32,7 +36,6 @@ const FILTERS = [
 ];
 
 const EMPTY_EMPLOYEE = {
-  employee_id: "",
   name: "",
   department: "",
   country: "",
@@ -42,7 +45,6 @@ const EMPTY_EMPLOYEE = {
 };
 
 const EMPLOYEE_FIELDS = [
-  ["employee_id", "Employee ID"],
   ["name", "Name"],
   ["department", "Department"],
   ["country", "Country"],
@@ -59,6 +61,26 @@ function EmployeeForm({ employee, filters, onClose, onSaved }) {
   const [fieldErrors, setFieldErrors] = useState({});
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [previewId, setPreviewId] = useState(employee?.employee_id || "");
+
+  useEffect(() => {
+    if (editing) return undefined;
+    let active = true;
+    getNextEmployeeId()
+      .then((result) => {
+        if (active) {
+          setPreviewId(result.employee_id);
+          setFieldErrors((current) => ({ ...current, employee_id: undefined }));
+        }
+      })
+      .catch((error) => {
+        if (active) setFieldErrors((current) => ({
+          ...current,
+          employee_id: error.message || "Unable to preview the employee ID.",
+        }));
+      });
+    return () => { active = false; };
+  }, [editing]);
 
   function setValue(name, value) {
     setValues((current) => ({ ...current, [name]: value }));
@@ -66,38 +88,68 @@ function EmployeeForm({ employee, filters, onClose, onSaved }) {
     setFormError("");
   }
 
+  function setSalaryValue(rawValue) {
+    const negativeSign = rawValue.startsWith("-");
+    let sanitized = rawValue.replace(/[^\d.]/g, "");
+    const decimalPoint = sanitized.indexOf(".");
+    if (decimalPoint !== -1) {
+      sanitized = `${sanitized.slice(0, decimalPoint)}.${sanitized.slice(decimalPoint + 1).replace(/\./g, "")}`;
+    }
+    if (sanitized.startsWith(".")) sanitized = `0${sanitized}`;
+    const [whole = "", fraction] = sanitized.split(".");
+    const hadDecimal = sanitized.includes(".");
+    const tooManyWholeDigits = whole.length > 10;
+    const tooManyFractionDigits = (fraction || "").length > 2;
+    const limited = `${whole.slice(0, 10)}${hadDecimal ? `.${(fraction || "").slice(0, 2)}` : ""}`;
+    const value = `${negativeSign ? "-" : ""}${limited}`;
+    const numericSalary = Number(value);
+    let error;
+    if (negativeSign && numericSalary < 0) error = "Salary cannot be negative.";
+    else if (tooManyWholeDigits || tooManyFractionDigits) error = SALARY_LIMIT_MESSAGE;
+    else if (value && value !== "-" && numericSalary > MAX_SALARY) error = SALARY_LIMIT_MESSAGE;
+    setValues((current) => ({ ...current, annual_gross_base_salary: value }));
+    setFieldErrors((current) => ({ ...current, annual_gross_base_salary: error }));
+    setFormError("");
+  }
+
+  function salaryError(value) {
+    if (!value) return "Annual salary is required.";
+    if (value.startsWith("-")) return "Salary cannot be negative.";
+    if (!/^\d{1,10}(?:\.\d{1,2})?$/.test(value)) return SALARY_LIMIT_MESSAGE;
+    if (Number(value) > MAX_SALARY) return SALARY_LIMIT_MESSAGE;
+    return "";
+  }
+
   async function submit(event) {
     event.preventDefault();
     const errors = {};
     for (const [name, label] of EMPLOYEE_FIELDS) {
-      if (name === "employee_id" && editing) continue;
       if (!String(values[name] ?? "").trim()) errors[name] = `${label} is required.`;
     }
-    const salary = Number(values.annual_gross_base_salary);
-    if (values.annual_gross_base_salary !== "" && (!Number.isFinite(salary) || salary < 0)) {
-      errors.annual_gross_base_salary = "Enter a valid salary of zero or more.";
-    }
+    const rawSalary = values.annual_gross_base_salary;
+    const salaryValidationError = salaryError(rawSalary);
+    if (salaryValidationError) errors.annual_gross_base_salary = salaryValidationError;
     if (Object.keys(errors).length) {
       setFieldErrors(errors);
       return;
     }
 
     const payload = {
-      ...(editing ? {} : { employee_id: values.employee_id.trim() }),
       name: values.name.trim(),
       department: values.department.trim(),
       country: values.country.trim(),
       employment_status: values.employment_status,
-      annual_gross_base_salary: salary,
+      annual_gross_base_salary: Number(rawSalary),
       currency: values.currency,
     };
     setSaving(true);
     setFieldErrors({});
     setFormError("");
     try {
-      if (editing) await updateEmployee(employee.employee_id, payload);
-      else await createEmployee(payload);
-      onSaved();
+      const savedEmployee = editing
+        ? await updateEmployee(employee.employee_id, payload)
+        : await createEmployee(payload);
+      onSaved(savedEmployee);
     } catch (error) {
       if (error.status === 422 && Array.isArray(error.detail)) {
         const mapped = {};
@@ -127,8 +179,10 @@ function EmployeeForm({ employee, filters, onClose, onSaved }) {
     const common = {
       id: `employee-${name}`,
       value: values[name] ?? "",
-      onChange: (event) => setValue(name, event.target.value),
-      disabled: saving || (name === "employee_id" && editing),
+      onChange: (event) => name === "annual_gross_base_salary"
+        ? setSalaryValue(event.target.value)
+        : setValue(name, event.target.value),
+      disabled: saving,
       "aria-invalid": Boolean(fieldErrors[name]),
       "aria-describedby": fieldErrors[name] ? `employee-${name}-error` : undefined,
     };
@@ -149,17 +203,34 @@ function EmployeeForm({ employee, filters, onClose, onSaved }) {
       control = <input
         {...common}
         required
-        type={name === "annual_gross_base_salary" ? "number" : "text"}
-        min={name === "annual_gross_base_salary" ? "0" : undefined}
-        step={name === "annual_gross_base_salary" ? "any" : undefined}
+        type="text"
+        inputMode={name === "annual_gross_base_salary" ? "decimal" : undefined}
         autoComplete={name === "name" ? "name" : "off"}
-        placeholder={name === "employee_id" ? "EMP-00001" : undefined}
+        placeholder={name === "annual_gross_base_salary" ? "0.00" : undefined}
       />;
     }
     return <label className="employee-form-field" htmlFor={`employee-${name}`} key={name}>
       <span>{label}</span>
       {control}
+      {name === "annual_gross_base_salary" && <small className="field-hint">Up to 10 digits before the decimal and 2 after.</small>}
       {fieldErrors[name] && <small className="field-error" id={`employee-${name}-error`}>{fieldErrors[name]}</small>}
+    </label>;
+  }
+
+  function renderEmployeeId() {
+    const errorId = "employee-employee_id-error";
+    return <label className="employee-form-field" htmlFor="employee-employee_id" key="employee_id">
+      <span>Employee ID</span>
+      <input
+        id="employee-employee_id"
+        value={previewId}
+        readOnly
+        aria-invalid={Boolean(fieldErrors.employee_id)}
+        aria-describedby={fieldErrors.employee_id ? errorId : undefined}
+        placeholder={editing ? "" : "Loading ID…"}
+      />
+      {!editing && <small className="field-hint">Assigned automatically when the employee is saved.</small>}
+      {fieldErrors.employee_id && <small className="field-error" id={errorId}>{fieldErrors.employee_id}</small>}
     </label>;
   }
 
@@ -177,6 +248,7 @@ function EmployeeForm({ employee, filters, onClose, onSaved }) {
       {formError && <p className="form-error" role="alert">{formError}</p>}
       <form onSubmit={submit} noValidate>
         <div className="employee-form-grid">
+          {renderEmployeeId()}
           {EMPLOYEE_FIELDS.map(([name, label]) => renderField(name, label))}
         </div>
         <div className="form-actions">
@@ -210,6 +282,7 @@ export default function Employees() {
   const [error, setError] = useState("");
   const [formEmployee, setFormEmployee] = useState(undefined);
   const [mutationError, setMutationError] = useState("");
+  const [mutationNotice, setMutationNotice] = useState("");
   const [deletingId, setDeletingId] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const requestSequence = useRef(0);
@@ -257,9 +330,10 @@ export default function Employees() {
     return () => { active = false; };
   }, [urlState, refreshKey]);
 
-  function finishSave() {
+  function finishSave(savedEmployee) {
     setFormEmployee(undefined);
     setMutationError("");
+    setMutationNotice(savedEmployee?.employee_id ? `Saved employee ${savedEmployee.employee_id}.` : "Employee saved.");
     setRefreshKey((value) => value + 1);
   }
 
@@ -267,6 +341,7 @@ export default function Employees() {
     const confirmed = window.confirm(`Delete ${employee.name} (${employee.employee_id})? This cannot be undone.`);
     if (!confirmed) return;
     setMutationError("");
+    setMutationNotice("");
     setDeletingId(employee.employee_id);
     try {
       await deleteEmployee(employee.employee_id);
@@ -317,6 +392,7 @@ export default function Employees() {
 
       <section className="panel employee-panel">
         {mutationError && <p className="mutation-error" role="alert">{mutationError}</p>}
+        {mutationNotice && <p className="mutation-notice" role="status">{mutationNotice}</p>}
         <div className="employee-toolbar">
           <label className="search-field">
             <span>Search employees</span>
