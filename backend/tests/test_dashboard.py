@@ -15,13 +15,16 @@ from app.main import app
 def dashboard_transport(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> ASGITransport:
+    """Provide the database transport used by dashboard tests."""
     monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "dashboard.db"))
     init_db()
     return ASGITransport(app=app)
 
 
 def _get_dashboard(transport: ASGITransport) -> Response:
+    """Request the salary dashboard from the test application."""
     async def send_request() -> Response:
+        """Send a request through the configured test transport."""
         async with AsyncClient(
             transport=transport,
             base_url="http://testserver",
@@ -32,6 +35,7 @@ def _get_dashboard(transport: ASGITransport) -> Response:
 
 
 def _insert_employees(employees: list[dict[str, object]]) -> None:
+    """Insert employee records for dashboard test cases."""
     connection = connect()
     try:
         for employee in employees:
@@ -57,6 +61,7 @@ def _employee(
     country: str,
     status: str = "Active",
 ) -> dict[str, object]:
+    """Build an employee record with optional field overrides."""
     return {
         "employee_id": employee_id,
         "name": f"Employee {employee_id}",
@@ -71,6 +76,7 @@ def _employee(
 def test_dashboard_groups_and_averages_salaries_by_currency(
     dashboard_transport: ASGITransport,
 ) -> None:
+    """Verify that dashboard groups and averages salaries by currency."""
     _insert_employees(
         [
             _employee("EMP-00001", salary=100_000, currency="USD", country="United States"),
@@ -114,6 +120,7 @@ def test_dashboard_groups_and_averages_salaries_by_currency(
 def test_dashboard_empty_database_returns_no_currency_groups(
     dashboard_transport: ASGITransport,
 ) -> None:
+    """Verify that dashboard empty database returns no currency groups."""
     response = _get_dashboard(dashboard_transport)
 
     assert response.status_code == 200

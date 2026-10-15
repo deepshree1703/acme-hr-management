@@ -58,6 +58,7 @@ LAST_NAMES = (
 
 
 def _employee_rows(count: int) -> Iterator[tuple[object, ...]]:
+    """Yield deterministic employee records for the requested count."""
     rng = random.Random(RANDOM_SEED)
     currencies = set(SUPPORTED_CURRENCIES)
     if currencies != set(SALARY_RANGES):
@@ -117,6 +118,7 @@ def seed_employees(count: int = EMPLOYEE_COUNT, batch_size: int = BATCH_SIZE) ->
 
 
 def _take(rows: Iterator[tuple[object, ...]], count: int) -> Iterator[tuple[object, ...]]:
+    """Yield up to ``count`` rows from an iterator."""
     for _ in range(count):
         try:
             yield next(rows)
@@ -125,6 +127,7 @@ def _take(rows: Iterator[tuple[object, ...]], count: int) -> Iterator[tuple[obje
 
 
 def main() -> None:
+    """Seed the configured database and print the inserted and total counts."""
     added, total = seed_employees()
     print(f"Added {added} employees. Total employees: {total}.")
 

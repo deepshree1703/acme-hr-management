@@ -14,9 +14,13 @@ class Cursor(Protocol):
 
     rowcount: int
 
-    def fetchone(self) -> Any: ...
+    def fetchone(self) -> Any:
+        """Return the next row, or None when the result set is exhausted."""
+        ...
 
-    def fetchall(self) -> list[Any]: ...
+    def fetchall(self) -> list[Any]:
+        """Return all remaining rows from the result set."""
+        ...
 
 
 class DatabaseConnection(Protocol):
@@ -24,17 +28,27 @@ class DatabaseConnection(Protocol):
 
     dialect: str
 
-    def execute(self, sql: str, parameters: Sequence[Any] = ()) -> Cursor: ...
+    def execute(self, sql: str, parameters: Sequence[Any] = ()) -> Cursor:
+        """Execute one parameterized SQL statement and return its cursor."""
+        ...
 
     def executemany(
         self, sql: str, parameters: Iterable[Sequence[Any]]
-    ) -> Cursor: ...
+    ) -> Cursor:
+        """Execute a parameterized SQL statement for each parameter set."""
+        ...
 
-    def close(self) -> None: ...
+    def close(self) -> None:
+        """Release the underlying database connection."""
+        ...
 
-    def __enter__(self) -> DatabaseConnection: ...
+    def __enter__(self) -> DatabaseConnection:
+        """Begin a connection context and return this connection."""
+        ...
 
-    def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> bool | None: ...
+    def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> bool | None:
+        """Finish the connection context, committing or rolling back as needed."""
+        ...
 
 
 try:
@@ -80,11 +94,13 @@ class _ConnectionAdapter:
     """Preserve shared SQL and transaction semantics across database drivers."""
 
     def __init__(self, connection: Any, dialect: str) -> None:
+        """Wrap a driver connection with the shared database interface."""
         self._connection = connection
         self.dialect = dialect
         self._transactions: list[Any] = []
 
     def execute(self, sql: str, parameters: Sequence[Any] = ()) -> Cursor:
+        """Execute SQL, adapting qmark placeholders for PostgreSQL when needed."""
         if self.dialect == "postgresql":
             sql = _qmark_to_psycopg(sql)
         return self._connection.execute(sql, parameters)
@@ -92,6 +108,7 @@ class _ConnectionAdapter:
     def executemany(
         self, sql: str, parameters: Iterable[Sequence[Any]]
     ) -> Cursor:
+        """Execute SQL for multiple parameter sets using the selected driver."""
         if self.dialect == "postgresql":
             sql = _qmark_to_psycopg(sql)
             cursor = self._connection.cursor()
@@ -100,9 +117,11 @@ class _ConnectionAdapter:
         return self._connection.executemany(sql, parameters)
 
     def close(self) -> None:
+        """Close the wrapped database connection."""
         self._connection.close()
 
     def __enter__(self) -> _ConnectionAdapter:
+        """Start a transaction and return this adapter as a context manager."""
         if self.dialect == "postgresql":
             transaction = self._connection.transaction()
             transaction.__enter__()
@@ -112,6 +131,7 @@ class _ConnectionAdapter:
         return self
 
     def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> bool | None:
+        """Commit or roll back the active transaction when leaving the context."""
         if self.dialect == "postgresql":
             return self._transactions.pop().__exit__(exc_type, exc_value, traceback)
         return self._connection.__exit__(exc_type, exc_value, traceback)

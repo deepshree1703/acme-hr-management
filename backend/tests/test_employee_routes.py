@@ -13,6 +13,7 @@ from app.main import app
 
 @pytest.fixture
 def api_transport(monkeypatch: pytest.MonkeyPatch, tmp_path) -> ASGITransport:
+    """Provide the API transport used by employee route tests."""
     monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "employees.db"))
     init_db()
     return ASGITransport(app=app)
@@ -25,7 +26,9 @@ def _request(
     payload: dict[str, object] | None = None,
     params: dict[str, str | int] | None = None,
 ) -> Response:
+    """Send a request through the employee API test transport."""
     async def send_request() -> Response:
+        """Send a request through the configured test transport."""
         async with AsyncClient(
             transport=transport,
             base_url="http://testserver",
@@ -36,6 +39,7 @@ def _request(
 
 
 def valid_employee_payload() -> dict[str, object]:
+    """Return a valid employee creation payload."""
     return {
         "name": "Alex Example",
         "department": "Operations",
@@ -47,12 +51,14 @@ def valid_employee_payload() -> dict[str, object]:
 
 
 def valid_update_payload() -> dict[str, object]:
+    """Return a valid employee update payload."""
     return valid_employee_payload()
 
 
 def _seed_employees(
     employees: list[dict[str, object]],
 ) -> None:
+    """Insert employee fixtures for route tests."""
     connection = connect()
     try:
         for employee in employees:
@@ -71,6 +77,7 @@ def _seed_employees(
 
 
 def _list_filter_employees() -> list[dict[str, object]]:
+    """Create employee fixtures for list and filter tests."""
     return [
         {
             **valid_employee_payload(),
@@ -112,6 +119,7 @@ def _list_filter_employees() -> list[dict[str, object]]:
 
 
 def test_create_employee_returns_created_record(api_transport: ASGITransport) -> None:
+    """Verify that create employee returns created record."""
     response = _request(api_transport, "POST", "/employees", valid_employee_payload())
 
     assert response.status_code == 201
@@ -125,6 +133,7 @@ def test_create_employee_returns_created_record(api_transport: ASGITransport) ->
 def test_two_creates_get_different_ids(
     api_transport: ASGITransport,
 ) -> None:
+    """Verify that two creates get different ids."""
     first = _request(api_transport, "POST", "/employees", valid_employee_payload())
     second = _request(api_transport, "POST", "/employees", valid_employee_payload())
     assert first.json()["employee_id"] == "EMP-00001"
@@ -132,6 +141,7 @@ def test_two_creates_get_different_ids(
 
 
 def test_create_id_uses_highest_numeric_part(api_transport: ASGITransport) -> None:
+    """Verify that create id uses highest numeric part."""
     _seed_employees([
         valid_employee_payload() | {"employee_id": "EMP-99999"},
         valid_employee_payload() | {"employee_id": "EMP-100000"},
@@ -143,6 +153,7 @@ def test_create_id_uses_highest_numeric_part(api_transport: ASGITransport) -> No
 def test_create_id_after_deleting_latest_uses_new_current_maximum(
     api_transport: ASGITransport,
 ) -> None:
+    """Verify that create id after deleting latest uses new current maximum."""
     first = _request(api_transport, "POST", "/employees", valid_employee_payload())
     latest = _request(api_transport, "POST", "/employees", valid_employee_payload())
     _request(api_transport, "DELETE", f"/employees/{latest.json()['employee_id']}")
@@ -152,6 +163,7 @@ def test_create_id_after_deleting_latest_uses_new_current_maximum(
 
 
 def test_next_id_matches_next_created_employee(api_transport: ASGITransport) -> None:
+    """Verify that next id matches next created employee."""
     _seed_employees([valid_employee_payload() | {"employee_id": "EMP-99999"}])
     preview = _request(api_transport, "GET", "/employees/next-id")
     created = _request(api_transport, "POST", "/employees", valid_employee_payload())
@@ -161,6 +173,7 @@ def test_next_id_matches_next_created_employee(api_transport: ASGITransport) -> 
 
 
 def test_create_rejects_client_sent_employee_id(api_transport: ASGITransport) -> None:
+    """Verify that create rejects client sent employee id."""
     payload = valid_employee_payload() | {"employee_id": "EMP-00001"}
     assert _request(api_transport, "POST", "/employees", payload).status_code == 422
 
@@ -176,6 +189,7 @@ def test_create_rejects_client_sent_employee_id(api_transport: ASGITransport) ->
 def test_create_employee_rejects_invalid_payloads(
     api_transport: ASGITransport, field: str, value: object
 ) -> None:
+    """Verify that create employee rejects invalid payloads."""
     payload = valid_employee_payload()
     payload[field] = value
 
@@ -185,6 +199,7 @@ def test_create_employee_rejects_invalid_payloads(
 
 
 def test_get_existing_employee_returns_record(api_transport: ASGITransport) -> None:
+    """Verify that get existing employee returns record."""
     payload = valid_employee_payload()
     _request(api_transport, "POST", "/employees", payload)
 
@@ -196,6 +211,7 @@ def test_get_existing_employee_returns_record(api_transport: ASGITransport) -> N
 
 
 def test_get_missing_employee_returns_not_found(api_transport: ASGITransport) -> None:
+    """Verify that get missing employee returns not found."""
     response = _request(api_transport, "GET", "/employees/EMP-99999")
 
     assert response.status_code == 404
@@ -205,6 +221,7 @@ def test_get_missing_employee_returns_not_found(api_transport: ASGITransport) ->
 def test_employee_filter_options_return_distinct_values_and_supported_options(
     api_transport: ASGITransport,
 ) -> None:
+    """Verify that employee filter options return distinct values and supported options."""
     _seed_employees(
         [
             {
@@ -240,6 +257,7 @@ def test_employee_filter_options_return_distinct_values_and_supported_options(
 
 
 def test_update_employee_returns_replacement_record(api_transport: ASGITransport) -> None:
+    """Verify that update employee returns replacement record."""
     _request(api_transport, "POST", "/employees", valid_employee_payload())
     payload = valid_update_payload()
     payload.update(
@@ -266,6 +284,7 @@ def test_update_employee_returns_replacement_record(api_transport: ASGITransport
 def test_update_missing_employee_returns_not_found(
     api_transport: ASGITransport,
 ) -> None:
+    """Verify that update missing employee returns not found."""
     response = _request(
         api_transport,
         "PUT",
@@ -287,6 +306,7 @@ def test_update_missing_employee_returns_not_found(
 def test_update_employee_rejects_invalid_payloads(
     api_transport: ASGITransport, field: str, value: object
 ) -> None:
+    """Verify that update employee rejects invalid payloads."""
     payload = valid_update_payload()
     payload[field] = value
 
@@ -298,6 +318,7 @@ def test_update_employee_rejects_invalid_payloads(
 def test_update_employee_rejects_employee_id_in_body(
     api_transport: ASGITransport,
 ) -> None:
+    """Verify that update employee rejects employee id in body."""
     payload = valid_update_payload()
     payload["employee_id"] = "EMP-00002"
 
@@ -309,6 +330,7 @@ def test_update_employee_rejects_employee_id_in_body(
 def test_delete_employee_returns_no_content_and_fetch_then_returns_not_found(
     api_transport: ASGITransport,
 ) -> None:
+    """Verify that delete employee returns no content and fetch then returns not found."""
     _request(api_transport, "POST", "/employees", valid_employee_payload())
 
     response = _request(api_transport, "DELETE", "/employees/EMP-00001")
@@ -321,6 +343,7 @@ def test_delete_employee_returns_no_content_and_fetch_then_returns_not_found(
 def test_delete_missing_employee_returns_not_found(
     api_transport: ASGITransport,
 ) -> None:
+    """Verify that delete missing employee returns not found."""
     response = _request(api_transport, "DELETE", "/employees/EMP-99999")
 
     assert response.status_code == 404
@@ -330,6 +353,7 @@ def test_delete_missing_employee_returns_not_found(
 def test_list_employees_uses_fixed_size_pages_and_reports_totals(
     api_transport: ASGITransport,
 ) -> None:
+    """Verify that list employees uses fixed size pages and reports totals."""
     employees = []
     for index in range(1, 46):
         employee = valid_employee_payload()
@@ -368,6 +392,7 @@ def test_list_employees_uses_fixed_size_pages_and_reports_totals(
 
 
 def test_list_employees_searches_name_case_insensitively(api_transport: ASGITransport) -> None:
+    """Verify that list employees searches name case insensitively."""
     _seed_employees(_list_filter_employees())
 
     response = _request(
@@ -387,6 +412,7 @@ def test_list_employees_searches_name_case_insensitively(api_transport: ASGITran
 
 
 def test_list_employees_searches_by_employee_id(api_transport: ASGITransport) -> None:
+    """Verify that list employees searches by employee id."""
     _seed_employees(_list_filter_employees())
 
     response = _request(
@@ -405,6 +431,7 @@ def test_list_employees_searches_by_employee_id(api_transport: ASGITransport) ->
 def test_list_employees_searches_employee_id_by_case_insensitive_prefix(
     api_transport: ASGITransport,
 ) -> None:
+    """Verify that list employees searches employee id by case insensitive prefix."""
     employees = []
     for index in range(1, 21):
         employee = valid_employee_payload()
@@ -450,6 +477,7 @@ def test_list_employees_applies_each_exact_filter(
     filter_params: dict[str, str],
     expected_ids: list[str],
 ) -> None:
+    """Verify that list employees applies each exact filter."""
     _seed_employees(_list_filter_employees())
 
     response = _request(
@@ -466,6 +494,7 @@ def test_list_employees_applies_each_exact_filter(
 
 
 def test_list_employees_combines_filters_with_and(api_transport: ASGITransport) -> None:
+    """Verify that list employees combines filters with and."""
     _seed_employees(_list_filter_employees())
 
     response = _request(
@@ -489,6 +518,7 @@ def test_list_employees_combines_filters_with_and(api_transport: ASGITransport) 
 def test_list_employees_returns_empty_results_with_zero_totals(
     api_transport: ASGITransport,
 ) -> None:
+    """Verify that list employees returns empty results with zero totals."""
     response = _request(
         api_transport,
         "GET",
@@ -513,6 +543,7 @@ def test_list_employees_returns_empty_results_with_zero_totals(
 def test_list_employees_rejects_invalid_query_parameters(
     api_transport: ASGITransport, query: dict[str, str | int]
 ) -> None:
+    """Verify that list employees rejects invalid query parameters."""
     response = _request(api_transport, "GET", "/employees", params=query)
 
     assert response.status_code == 422

@@ -29,6 +29,7 @@ class DuplicateEmployeeError(Exception):
 
 
 def _next_employee_id(connection: DatabaseConnection) -> str:
+    """Generate the next employee ID from the highest existing numeric ID."""
     row = connection.execute(
         """SELECT MAX(CAST(SUBSTR(employee_id, 5) AS INTEGER)) AS highest_id
            FROM employees"""
