@@ -12,11 +12,13 @@ import {
 const MAX_SALARY = 9999999999.99;
 const SALARY_LIMIT_MESSAGE = "Salary can have at most 10 digits before the decimal and 2 after (maximum 9999999999.99).";
 
+/** Parse a positive page number, defaulting invalid values to page one. */
 function readPage(value) {
   const parsed = Number.parseInt(value || "1", 10);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
 }
 
+/** Format a salary as currency, falling back when the currency is unsupported. */
 function formatSalary(amount, currency) {
   try {
     return new Intl.NumberFormat(undefined, {
@@ -53,6 +55,7 @@ const EMPLOYEE_FIELDS = [
   ["currency", "Currency"],
 ];
 
+/** Render the employee create/edit form and handle its validation and submission. */
 function EmployeeForm({ employee, filters, onClose, onSaved }) {
   const editing = Boolean(employee);
   const [values, setValues] = useState(() => employee
@@ -82,12 +85,14 @@ function EmployeeForm({ employee, filters, onClose, onSaved }) {
     return () => { active = false; };
   }, [editing]);
 
+  /** Update a field value and clear its validation error. */
   function setValue(name, value) {
     setValues((current) => ({ ...current, [name]: value }));
     setFieldErrors((current) => ({ ...current, [name]: undefined }));
     setFormError("");
   }
 
+  /** Sanitize salary input and report values outside the supported limits. */
   function setSalaryValue(rawValue) {
     const negativeSign = rawValue.startsWith("-");
     let sanitized = rawValue.replace(/[^\d.]/g, "");
@@ -112,6 +117,7 @@ function EmployeeForm({ employee, filters, onClose, onSaved }) {
     setFormError("");
   }
 
+  /** Return a validation message when the salary value is invalid. */
   function salaryError(value) {
     if (!value) return "Annual salary is required.";
     if (value.startsWith("-")) return "Salary cannot be negative.";
@@ -120,6 +126,7 @@ function EmployeeForm({ employee, filters, onClose, onSaved }) {
     return "";
   }
 
+  /** Validate and submit the employee form. */
   async function submit(event) {
     event.preventDefault();
     const errors = {};
@@ -175,6 +182,7 @@ function EmployeeForm({ employee, filters, onClose, onSaved }) {
     }
   }
 
+  /** Render the control and validation feedback for one employee field. */
   function renderField(name, label) {
     const common = {
       id: `employee-${name}`,
@@ -217,6 +225,7 @@ function EmployeeForm({ employee, filters, onClose, onSaved }) {
     </label>;
   }
 
+  /** Render the read-only employee ID field and its preview status. */
   function renderEmployeeId() {
     const errorId = "employee-employee_id-error";
     return <label className="employee-form-field" htmlFor="employee-employee_id" key="employee_id">
@@ -260,6 +269,7 @@ function EmployeeForm({ employee, filters, onClose, onSaved }) {
   </div>;
 }
 
+/** Display the employee directory, filters, pagination, and edit actions. */
 export default function Employees() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryString = searchParams.toString();
@@ -330,6 +340,7 @@ export default function Employees() {
     return () => { active = false; };
   }, [urlState, refreshKey]);
 
+  /** Close the form, show a save notice, and refresh the employee list. */
   function finishSave(savedEmployee) {
     setFormEmployee(undefined);
     setMutationError("");
@@ -337,6 +348,7 @@ export default function Employees() {
     setRefreshKey((value) => value + 1);
   }
 
+  /** Confirm and delete an employee, then keep pagination in a valid state. */
   async function removeEmployee(employee) {
     const confirmed = window.confirm(`Delete ${employee.name} (${employee.employee_id})? This cannot be undone.`);
     if (!confirmed) return;
@@ -362,6 +374,7 @@ export default function Employees() {
     }
   }
 
+  /** Update one URL-backed filter and reset pagination. */
   function updateFilter(name, value) {
     const next = new URLSearchParams(queryString);
     if (value) next.set(name, value);
@@ -370,6 +383,7 @@ export default function Employees() {
     setSearchParams(next);
   }
 
+  /** Navigate to a page while preserving the current URL filters. */
   function changePage(page) {
     const next = new URLSearchParams(queryString);
     if (page <= 1) next.delete("page");

@@ -1,6 +1,7 @@
 const DEFAULT_API_URL = import.meta.env.DEV ? "http://localhost:8000" : "/api";
 const API_BASE_URL = (import.meta.env.VITE_API_URL || DEFAULT_API_URL).replace(/\/$/, "");
 
+/** Send a request to the API and parse its response or throw a readable error. */
 async function request(path, options = {}) {
   let response;
   try {
@@ -46,18 +47,22 @@ async function request(path, options = {}) {
   return body;
 }
 
+/** Load salary summaries and overall headcount. */
 export function getDashboard() {
   return request("/dashboard");
 }
 
+/** Load the values available for employee filters and form selections. */
 export function getEmployeeFilterOptions() {
   return request("/employees/filters");
 }
 
+/** Preview the next employee ID for the create form. */
 export function getNextEmployeeId() {
   return request("/employees/next-id");
 }
 
+/** Load a page of employees matching the supplied filters. */
 export function getEmployees(params) {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -68,6 +73,7 @@ export function getEmployees(params) {
   return request(`/employees?${query.toString()}`);
 }
 
+/** Create an employee record from the supplied fields. */
 export function createEmployee(employee) {
   return request("/employees", {
     method: "POST",
@@ -76,6 +82,7 @@ export function createEmployee(employee) {
   });
 }
 
+/** Replace an employee's editable fields. */
 export function updateEmployee(employeeId, employee) {
   return request(`/employees/${encodeURIComponent(employeeId)}`, {
     method: "PUT",
@@ -84,6 +91,7 @@ export function updateEmployee(employeeId, employee) {
   });
 }
 
+/** Delete the employee with the supplied ID. */
 export function deleteEmployee(employeeId) {
   return request(`/employees/${encodeURIComponent(employeeId)}`, { method: "DELETE" });
 }
