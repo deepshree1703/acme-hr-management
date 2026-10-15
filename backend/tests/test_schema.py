@@ -106,8 +106,9 @@ def test_init_db_uses_postgresql_constraints_and_types(
     db_schema.init_db()
 
     schema = statements[0]
-    assert "employee_id ~ '^EMP-[0-9]{5}$'" in schema
+    assert "employee_id ~ '^EMP-[0-9]{5,}$'" in schema
     assert "annual_gross_base_salary DOUBLE PRECISION NOT NULL" in schema
+    assert "annual_gross_base_salary <= 9999999999.99" in schema
     assert len(statements) == 5
 
 
@@ -125,6 +126,7 @@ def test_employee_constraints_reject_invalid_values(
             {"employee_id": "EMP-00002", "employment_status": "On leave"},
             {"employee_id": "EMP-00003", "currency": "XYZ"},
             {"employee_id": "EMP-00004", "annual_gross_base_salary": -1},
+            {"employee_id": "EMP-00005", "annual_gross_base_salary": 10000000000},
             {"employee_id": "EMP-1"},
             {"employee_id": "EMP-00001"},
         )

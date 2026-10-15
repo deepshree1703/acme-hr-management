@@ -7,7 +7,6 @@ from app.schemas import EmployeeCreate, EmployeeRead, EmployeeUpdate
 
 
 VALID_CREATE = {
-    "employee_id": "EMP-00001",
     "name": "  Alex Example  ",
     "department": "  Operations ",
     "country": " India ",
@@ -16,15 +15,14 @@ VALID_CREATE = {
     "currency": "INR",
 }
 
-VALID_UPDATE = {key: value for key, value in VALID_CREATE.items() if key != "employee_id"}
+VALID_UPDATE = VALID_CREATE.copy()
 
 
 def test_employee_models_accept_valid_data_and_trim_required_text() -> None:
     created = EmployeeCreate(**VALID_CREATE)
     updated = EmployeeUpdate(**VALID_UPDATE)
-    read = EmployeeRead(**VALID_CREATE)
+    read = EmployeeRead(**(VALID_CREATE | {"employee_id": "EMP-00001"}))
 
-    assert created.employee_id == "EMP-00001"
     assert created.name == updated.name == read.name == "Alex Example"
     assert created.department == "Operations"
     assert created.country == "India"
@@ -34,7 +32,6 @@ def test_employee_models_accept_valid_data_and_trim_required_text() -> None:
 @pytest.mark.parametrize(
     ("field", "value"),
     [
-        ("employee_id", "EMP-1234"),
         ("name", "   "),
         ("department", ""),
         ("country", "  "),
@@ -62,3 +59,24 @@ def test_employee_update_requires_fields_and_rejects_employee_id() -> None:
     del incomplete_payload["name"]
     with pytest.raises(ValidationError):
         EmployeeUpdate(**incomplete_payload)
+
+
+def test_employee_create_forbids_client_employee_id() -> None:
+    with pytest.raises(ValidationError):
+        EmployeeCreate(**(VALID_CREATE | {"employee_id": "EMP-00001"}))
+
+
+@pytest.mark.parametrize("model", [EmployeeCreate, EmployeeUpdate])
+@pytest.mark.parametrize("salary", [9999999999.99, 100.25, 0])
+def test_employee_salary_limits_accept_valid_values(model, salary) -> None:
+    assert model(**(VALID_CREATE | {"annual_gross_base_salary": salary})).annual_gross_base_salary == salary
+
+
+@pytest.mark.parametrize("model", [EmployeeCreate, EmployeeUpdate])
+@pytest.mark.parametrize(
+    "salary",
+    [10000000000, 100.255, -0.01, float("nan"), float("inf"), float("-inf")],
+)
+def test_employee_salary_limits_reject_invalid_values(model, salary) -> None:
+    with pytest.raises(ValidationError):
+        model(**(VALID_CREATE | {"annual_gross_base_salary": salary}))

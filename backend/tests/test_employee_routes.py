@@ -9,8 +9,6 @@ from app.constants import EMPLOYMENT_STATUSES, SUPPORTED_CURRENCIES
 from app.db_schema import init_db
 from app.database import connect
 from app.main import app
-from app.repository import create_employee as repository_create_employee
-from app.schemas import EmployeeCreate
 
 
 @pytest.fixture
@@ -39,7 +37,6 @@ def _request(
 
 def valid_employee_payload() -> dict[str, object]:
     return {
-        "employee_id": "EMP-00001",
         "name": "Alex Example",
         "department": "Operations",
         "country": "India",
@@ -50,9 +47,7 @@ def valid_employee_payload() -> dict[str, object]:
 
 
 def valid_update_payload() -> dict[str, object]:
-    payload = valid_employee_payload()
-    del payload["employee_id"]
-    return payload
+    return valid_employee_payload()
 
 
 def _seed_employees(
@@ -61,7 +56,16 @@ def _seed_employees(
     connection = connect()
     try:
         for employee in employees:
-            repository_create_employee(connection, EmployeeCreate(**employee))
+            with connection:
+                connection.execute(
+                    """INSERT INTO employees (employee_id, name, department, country,
+                       employment_status, annual_gross_base_salary, currency)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    tuple(employee[key] for key in (
+                        "employee_id", "name", "department", "country",
+                        "employment_status", "annual_gross_base_salary", "currency"
+                    )),
+                )
     finally:
         connection.close()
 
@@ -113,20 +117,52 @@ def test_create_employee_returns_created_record(api_transport: ASGITransport) ->
     assert response.status_code == 201
     assert response.json() == {
         **valid_employee_payload(),
+        "employee_id": "EMP-00001",
         "annual_gross_base_salary": 50000.0,
     }
 
 
-def test_create_employee_returns_conflict_for_duplicate_id(
+def test_two_creates_get_different_ids(
     api_transport: ASGITransport,
 ) -> None:
-    payload = valid_employee_payload()
+    first = _request(api_transport, "POST", "/employees", valid_employee_payload())
+    second = _request(api_transport, "POST", "/employees", valid_employee_payload())
+    assert first.json()["employee_id"] == "EMP-00001"
+    assert second.json()["employee_id"] == "EMP-00002"
 
-    assert _request(api_transport, "POST", "/employees", payload).status_code == 201
-    response = _request(api_transport, "POST", "/employees", payload)
 
-    assert response.status_code == 409
-    assert response.json()["detail"] == "Employee ID EMP-00001 already exists"
+def test_create_id_uses_highest_numeric_part(api_transport: ASGITransport) -> None:
+    _seed_employees([
+        valid_employee_payload() | {"employee_id": "EMP-99999"},
+        valid_employee_payload() | {"employee_id": "EMP-100000"},
+    ])
+    response = _request(api_transport, "POST", "/employees", valid_employee_payload())
+    assert response.json()["employee_id"] == "EMP-100001"
+
+
+def test_create_id_after_deleting_latest_uses_new_current_maximum(
+    api_transport: ASGITransport,
+) -> None:
+    first = _request(api_transport, "POST", "/employees", valid_employee_payload())
+    latest = _request(api_transport, "POST", "/employees", valid_employee_payload())
+    _request(api_transport, "DELETE", f"/employees/{latest.json()['employee_id']}")
+    created = _request(api_transport, "POST", "/employees", valid_employee_payload())
+    assert first.json()["employee_id"] == "EMP-00001"
+    assert created.json()["employee_id"] == "EMP-00002"
+
+
+def test_next_id_matches_next_created_employee(api_transport: ASGITransport) -> None:
+    _seed_employees([valid_employee_payload() | {"employee_id": "EMP-99999"}])
+    preview = _request(api_transport, "GET", "/employees/next-id")
+    created = _request(api_transport, "POST", "/employees", valid_employee_payload())
+    assert preview.status_code == 200
+    assert preview.json() == {"employee_id": "EMP-100000"}
+    assert created.json()["employee_id"] == preview.json()["employee_id"]
+
+
+def test_create_rejects_client_sent_employee_id(api_transport: ASGITransport) -> None:
+    payload = valid_employee_payload() | {"employee_id": "EMP-00001"}
+    assert _request(api_transport, "POST", "/employees", payload).status_code == 422
 
 
 @pytest.mark.parametrize(

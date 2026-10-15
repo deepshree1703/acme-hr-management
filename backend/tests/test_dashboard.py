@@ -9,8 +9,6 @@ from httpx2 import ASGITransport, AsyncClient, Response
 from app.database import connect
 from app.db_schema import init_db
 from app.main import app
-from app.repository import create_employee
-from app.schemas import EmployeeCreate
 
 
 @pytest.fixture
@@ -37,7 +35,16 @@ def _insert_employees(employees: list[dict[str, object]]) -> None:
     connection = connect()
     try:
         for employee in employees:
-            create_employee(connection, EmployeeCreate(**employee))
+            with connection:
+                connection.execute(
+                    """INSERT INTO employees (employee_id, name, department, country,
+                       employment_status, annual_gross_base_salary, currency)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    tuple(employee[key] for key in (
+                        "employee_id", "name", "department", "country",
+                        "employment_status", "annual_gross_base_salary", "currency"
+                    )),
+                )
     finally:
         connection.close()
 
