@@ -12,17 +12,24 @@ def init_db() -> None:
     connection = connect()
     try:
         with connection:
+            employee_id_check = (
+                "employee_id ~ '^EMP-[0-9]{5}$'"
+                if connection.dialect == "postgresql"
+                else "employee_id GLOB 'EMP-[0-9][0-9][0-9][0-9][0-9]'"
+            )
+            salary_type = (
+                "DOUBLE PRECISION" if connection.dialect == "postgresql" else "REAL"
+            )
             connection.execute(
                 f"""
                 CREATE TABLE IF NOT EXISTS employees (
-                    employee_id TEXT PRIMARY KEY
-                        CHECK (employee_id GLOB 'EMP-[0-9][0-9][0-9][0-9][0-9]'),
+                    employee_id TEXT PRIMARY KEY CHECK ({employee_id_check}),
                     name TEXT NOT NULL,
                     department TEXT NOT NULL,
                     country TEXT NOT NULL,
                     employment_status TEXT NOT NULL
                         CHECK (employment_status IN ({allowed_statuses})),
-                    annual_gross_base_salary REAL NOT NULL
+                    annual_gross_base_salary {salary_type} NOT NULL
                         CHECK (annual_gross_base_salary >= 0),
                     currency TEXT NOT NULL
                         CHECK (currency IN ({allowed_currencies}))

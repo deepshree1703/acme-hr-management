@@ -1,8 +1,7 @@
 """Parameterized employee persistence operations."""
 
-import sqlite3
-
 from app.constants import EMPLOYMENT_STATUSES, PAGE_SIZE, SUPPORTED_CURRENCIES
+from app.database import DatabaseConnection
 from app.schemas import (
     CurrencySalarySummary,
     EmployeeCreate,
@@ -30,7 +29,7 @@ class DuplicateEmployeeError(Exception):
 
 
 def create_employee(
-    connection: sqlite3.Connection, employee: EmployeeCreate
+    connection: DatabaseConnection, employee: EmployeeCreate
 ) -> EmployeeRead:
     """Insert an employee and return the validated record."""
     with connection:
@@ -66,7 +65,7 @@ def create_employee(
 
 
 def get_employee_by_id(
-    connection: sqlite3.Connection, employee_id: str
+    connection: DatabaseConnection, employee_id: str
 ) -> EmployeeRead | None:
     """Fetch an employee by ID, returning None when no record matches."""
     row = connection.execute(_EMPLOYEE_SELECT, (employee_id,)).fetchone()
@@ -77,7 +76,7 @@ def get_employee_by_id(
 
 
 def update_employee(
-    connection: sqlite3.Connection,
+    connection: DatabaseConnection,
     employee_id: str,
     data: EmployeeUpdate,
 ) -> EmployeeRead | None:
@@ -114,7 +113,7 @@ def update_employee(
         return EmployeeRead.model_validate(dict(row))
 
 
-def delete_employee(connection: sqlite3.Connection, employee_id: str) -> bool:
+def delete_employee(connection: DatabaseConnection, employee_id: str) -> bool:
     """Delete an employee and report whether a row was removed."""
     with connection:
         cursor = connection.execute(
@@ -125,7 +124,7 @@ def delete_employee(connection: sqlite3.Connection, employee_id: str) -> bool:
 
 
 def list_employees(
-    connection: sqlite3.Connection,
+    connection: DatabaseConnection,
     *,
     page: int,
     search: str | None = None,
@@ -156,9 +155,9 @@ def list_employees(
 
     where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
     total = connection.execute(
-        f"SELECT COUNT(*) FROM employees {where_clause}",
+        f"SELECT COUNT(*) AS total_count FROM employees {where_clause}",
         parameters,
-    ).fetchone()[0]
+    ).fetchone()["total_count"]
     rows = connection.execute(
         f"""
         SELECT
@@ -181,7 +180,7 @@ def list_employees(
 
 
 def get_salary_dashboard(
-    connection: sqlite3.Connection,
+    connection: DatabaseConnection,
 ) -> tuple[list[CurrencySalarySummary], int]:
     """Return per-currency salary aggregates and the overall employee count."""
     rows = connection.execute(
@@ -189,7 +188,7 @@ def get_salary_dashboard(
         SELECT
             currency,
             COUNT(*) AS headcount,
-            ROUND(AVG(annual_gross_base_salary), 2)
+            ROUND(AVG(CAST(annual_gross_base_salary AS NUMERIC)), 2)
                 AS average_annual_gross_base_salary,
             (SELECT COUNT(*) FROM employees) AS total_headcount
         FROM employees
@@ -212,7 +211,7 @@ def get_salary_dashboard(
 
 
 def get_employee_filter_options(
-    connection: sqlite3.Connection,
+    connection: DatabaseConnection,
 ) -> EmployeeFilterOptions:
     """Return distinct database values and supported statuses and currencies."""
     countries = connection.execute(

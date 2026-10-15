@@ -79,6 +79,38 @@ def test_init_db_creates_table_and_indexes_idempotently(
     } <= indexes
 
 
+def test_init_db_uses_postgresql_constraints_and_types(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app import db_schema
+
+    statements: list[str] = []
+
+    class FakeConnection:
+        dialect = "postgresql"
+
+        def execute(self, sql, parameters=()):
+            statements.append(sql)
+
+        def close(self):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return False
+
+    monkeypatch.setattr(db_schema, "connect", FakeConnection)
+
+    db_schema.init_db()
+
+    schema = statements[0]
+    assert "employee_id ~ '^EMP-[0-9]{5}$'" in schema
+    assert "annual_gross_base_salary DOUBLE PRECISION NOT NULL" in schema
+    assert len(statements) == 5
+
+
 def test_employee_constraints_reject_invalid_values(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
