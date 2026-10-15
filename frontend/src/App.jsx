@@ -2,6 +2,7 @@ import { NavLink, Route, Routes } from "react-router-dom";
 import Dashboard from "./pages/Dashboard.jsx";
 import Employees from "./pages/Employees.jsx";
 
+/** Render the application shell and its routed pages. */
 export default function App() {
   return (
     <div className="app-shell">

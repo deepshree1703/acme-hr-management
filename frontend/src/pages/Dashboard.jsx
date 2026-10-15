@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getDashboard } from "../api.js";
 
+/** Format a salary as currency, falling back when the currency is unsupported. */
 function formatSalary(amount, currency) {
   try {
     return new Intl.NumberFormat(undefined, {
@@ -13,6 +14,7 @@ function formatSalary(amount, currency) {
   }
 }
 
+/** Load and display salary summaries and overall headcount. */
 export default function Dashboard() {
   const [dashboard, setDashboard] = useState(null);
   const [error, setError] = useState("");
