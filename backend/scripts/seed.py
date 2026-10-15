@@ -1,7 +1,6 @@
-"""Seed the local database with deterministic fictional employees."""
+"""Seed the configured database with deterministic fictional employees."""
 
 import random
-import sqlite3
 from collections.abc import Iterator
 
 from app.constants import EMPLOYMENT_STATUSES, SUPPORTED_CURRENCIES
@@ -109,7 +108,9 @@ def seed_employees(count: int = EMPLOYEE_COUNT, batch_size: int = BATCH_SIZE) ->
                     batch,
                 )
                 added += cursor.rowcount
-        total = connection.execute("SELECT COUNT(*) FROM employees").fetchone()[0]
+        total = connection.execute(
+            "SELECT COUNT(*) AS total_count FROM employees"
+        ).fetchone()["total_count"]
         return added, total
     finally:
         connection.close()

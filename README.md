@@ -6,7 +6,7 @@ Starter repository for the ACME Employee Salary Management project.
 
 - **Backend:** FastAPI (Python)
 - **Frontend:** React with JavaScript
-- **Database:** SQLite
+- **Database:** SQLite locally; Supabase PostgreSQL for deployment
 
 ## Repository layout
 
@@ -20,17 +20,21 @@ See [`docs/ACME_Employee_Salary_Management_Requirements.pdf`](docs/ACME_Employee
 
 ## Backend setup
 
-The backend uses Python 3.10 or newer, FastAPI, Uvicorn, and Python's built-in SQLite support.
+The backend uses Python 3.10 or newer, FastAPI, Uvicorn, Psycopg 3, and Python's built-in SQLite support.
 
 ```bash
 cd backend
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install -r requirements.txt
+python -m pip install -r requirements-dev.txt
 uvicorn app.main:app --reload
 ```
 
-The API is available at `http://127.0.0.1:8000`, with interactive API documentation at `/docs`. Check `http://127.0.0.1:8000/health` to verify the API and SQLite connection. The default database is created at `backend/data/acme_salary_management.db`. Set `DATABASE_PATH` to use another SQLite file; relative paths resolve from `backend/`, and absolute paths are also supported.
+`requirements-dev.txt` includes the runtime dependencies from `requirements.txt` (including `psycopg[binary]`) plus pytest and the HTTP test client. For a runtime-only local install, use `python -m pip install -r requirements.txt` instead.
+
+The API is available at `http://127.0.0.1:8000`, with interactive API documentation at `/docs`. Check `http://127.0.0.1:8000/health` to verify the configured database connection. The default local database is created at `backend/data/acme_salary_management.db`. Set `DATABASE_PATH` to use another SQLite file; relative paths resolve from `backend/`, and absolute paths are also supported.
+
+When `DATABASE_URL` is set, the backend uses PostgreSQL through Psycopg 3 instead of SQLite. For Vercel, set it to the Supabase PostgreSQL connection string in server-side environment variables. Without `DATABASE_URL`, local development continues to use `DATABASE_PATH` and SQLite.
 
 To seed 10,000 deterministic fictional employees into the configured database, run from `backend/`:
 
@@ -38,7 +42,7 @@ To seed 10,000 deterministic fictional employees into the configured database, r
 python -m scripts.seed
 ```
 
-To install pytest and run the backend tests from `backend/`, use `python -m pip install -r requirements-dev.txt` followed by `python -m pytest`.
+From `backend/` with the virtual environment active, run the backend tests with `python -m pytest`.
 
 ## Frontend setup
 
@@ -55,4 +59,18 @@ Open the local URL printed by Vite (normally `http://localhost:5173`). The API U
 
 ## Database
 
-SQLite is used for local development. The employees table is initialized when the backend starts. PostgreSQL is the planned deployment database.
+SQLite is used for local development when `DATABASE_URL` is unset. Supabase PostgreSQL is used for deployment when `DATABASE_URL` is configured. The employees table is initialized when the backend starts.
+
+### PostgreSQL integration test
+
+The PostgreSQL integration test is skipped unless `TEST_DATABASE_URL` points to a dedicated, empty test database. It also requires an explicit write confirmation, refuses to run on Vercel, refuses a target matching `DATABASE_URL`, and refuses a database that already contains employee rows. It removes the rows it seeds but leaves the initialized table and indexes in place. Never point it at production.
+
+From the repository root, set the URL for a disposable PostgreSQL database and run:
+
+```bash
+export TEST_DATABASE_URL='postgresql://user:password@host:5432/test_database'
+export CONFIRM_TEST_DATABASE_WRITES=YES
+./.venv/bin/python -m pytest -q backend/tests/test_postgres_integration.py
+```
+
+Do not set `TEST_DATABASE_URL` or `CONFIRM_TEST_DATABASE_WRITES` in Vercel. Vercel uses the server-side `DATABASE_URL` setting for the application database.

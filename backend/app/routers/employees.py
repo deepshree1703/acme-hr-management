@@ -2,12 +2,10 @@
 
 import math
 import re
-import sqlite3
-
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.constants import EMPLOYMENT_STATUSES, PAGE_SIZE
-from app.database import get_connection
+from app.database import DatabaseConnection, get_connection
 from app.repository import (
     DuplicateEmployeeError,
     create_employee as repository_create_employee,
@@ -36,7 +34,7 @@ def list_employees(
     department: str | None = None,
     employment_status: str | None = Query(default=None, pattern=_STATUS_PATTERN),
     page: int = Query(default=1, ge=1),
-    connection: sqlite3.Connection = Depends(get_connection),
+    connection: DatabaseConnection = Depends(get_connection),
 ) -> EmployeeListResponse:
     """List employees using filters and fixed-size backend pagination."""
     items, total = repository_list_employees(
@@ -58,7 +56,7 @@ def list_employees(
 
 @router.get("/filters", response_model=EmployeeFilterOptions)
 def employee_filter_options(
-    connection: sqlite3.Connection = Depends(get_connection),
+    connection: DatabaseConnection = Depends(get_connection),
 ) -> EmployeeFilterOptions:
     """Return options used by the employee list filters."""
     return repository_get_employee_filter_options(connection)
@@ -67,7 +65,7 @@ def employee_filter_options(
 @router.post("", response_model=EmployeeRead, status_code=status.HTTP_201_CREATED)
 def create_employee(
     employee: EmployeeCreate,
-    connection: sqlite3.Connection = Depends(get_connection),
+    connection: DatabaseConnection = Depends(get_connection),
 ) -> EmployeeRead:
     """Create an employee record."""
     try:
@@ -82,7 +80,7 @@ def create_employee(
 @router.get("/{employee_id}", response_model=EmployeeRead)
 def get_employee(
     employee_id: str,
-    connection: sqlite3.Connection = Depends(get_connection),
+    connection: DatabaseConnection = Depends(get_connection),
 ) -> EmployeeRead:
     """Fetch an employee by ID."""
     employee = repository_get_employee_by_id(connection, employee_id)
@@ -98,7 +96,7 @@ def get_employee(
 def update_employee(
     employee_id: str,
     employee: EmployeeUpdate,
-    connection: sqlite3.Connection = Depends(get_connection),
+    connection: DatabaseConnection = Depends(get_connection),
 ) -> EmployeeRead:
     """Replace an employee's editable fields."""
     updated_employee = repository_update_employee(connection, employee_id, employee)
@@ -113,7 +111,7 @@ def update_employee(
 @router.delete("/{employee_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_employee(
     employee_id: str,
-    connection: sqlite3.Connection = Depends(get_connection),
+    connection: DatabaseConnection = Depends(get_connection),
 ) -> None:
     """Delete an employee record."""
     deleted = repository_delete_employee(connection, employee_id)
