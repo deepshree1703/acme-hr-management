@@ -62,10 +62,28 @@ export function getNextEmployeeId() {
   return request("/employees/next-id");
 }
 
-/** Load a page of employees matching the supplied filters. */
-export function getEmployees(params) {
+/** Load a page of employees matching the supplied directory and salary filters. */
+export function getEmployees({
+  search,
+  country,
+  department,
+  employment_status,
+  currency,
+  min_salary,
+  max_salary,
+  page,
+}) {
   const query = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
+  for (const [key, value] of Object.entries({
+    search,
+    country,
+    department,
+    employment_status,
+    currency,
+    min_salary,
+    max_salary,
+    page,
+  })) {
     if (value !== "" && value !== undefined && value !== null) {
       query.set(key, String(value));
     }
