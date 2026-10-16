@@ -4,7 +4,7 @@ Starter repository for the ACME Employee Salary Management project.
 
 ## Links
 
-- **Demo video:** [Watch the demo](https://drive.google.com/file/d/1dg4X7WrxJLlAXs0Nvxr4e0W8Ot7n6UT8/view?usp=sharing)
+- **Demo video:** [Watch the demo](https://drive.google.com/file/d/1XNYK1eJ90VhA1bMPhaKbylkqPfU3WwRm/view?usp=sharing)
 - **Live application:** [Open the live application](https://acme-hr-management-one.vercel.app/)
 - **Requirements (1 page):** [docs/ACME_Employee_Salary_Management_Requirements.pdf](docs/ACME_Employee_Salary_Management_Requirements.pdf)
 
