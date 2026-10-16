@@ -8,6 +8,7 @@ import {
   getNextEmployeeId,
   updateEmployee,
 } from "../api.js";
+import { formatSalary } from "../format.js";
 
 const MAX_SALARY = 9999999999.99;
 const SALARY_LIMIT_MESSAGE = "Salary can have at most 10 digits before the decimal and 2 after (maximum 9999999999.99).";
@@ -16,19 +17,6 @@ const SALARY_LIMIT_MESSAGE = "Salary can have at most 10 digits before the decim
 function readPage(value) {
   const parsed = Number.parseInt(value || "1", 10);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
-}
-
-/** Format a salary as currency, falling back when the currency is unsupported. */
-function formatSalary(amount, currency) {
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  } catch {
-    return `${amount.toLocaleString()} ${currency}`;
-  }
 }
 
 const FILTERS = [
