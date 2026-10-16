@@ -15,6 +15,7 @@ SELECT
     employee_id,
     name,
     department,
+    designation,
     country,
     employment_status,
     annual_gross_base_salary,
@@ -56,17 +57,19 @@ def create_employee(
                     employee_id,
                     name,
                     department,
+                    designation,
                     country,
                     employment_status,
                     annual_gross_base_salary,
                     currency
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(employee_id) DO NOTHING
                 """,
                 (
                     employee_id,
                     employee.name,
                     employee.department,
+                    employee.designation,
                     employee.country,
                     employee.employment_status,
                     employee.annual_gross_base_salary,
@@ -104,6 +107,7 @@ def update_employee(
             SET
                 name = ?,
                 department = ?,
+                designation = ?,
                 country = ?,
                 employment_status = ?,
                 annual_gross_base_salary = ?,
@@ -113,6 +117,7 @@ def update_employee(
             (
                 data.name,
                 data.department,
+                data.designation,
                 data.country,
                 data.employment_status,
                 data.annual_gross_base_salary,
@@ -147,10 +152,13 @@ def list_employees(
     country: str | None = None,
     department: str | None = None,
     employment_status: str | None = None,
+    currency: str | None = None,
+    min_salary: float | None = None,
+    max_salary: float | None = None,
 ) -> tuple[list[EmployeeRead], int]:
     """Return one fixed-size employee page and the total matching count."""
     conditions: list[str] = []
-    parameters: list[str] = []
+    parameters: list[object] = []
 
     if search:
         conditions.append(
@@ -168,6 +176,15 @@ def list_employees(
     if employment_status is not None:
         conditions.append("employment_status = ?")
         parameters.append(employment_status)
+    if currency is not None:
+        conditions.append("currency = ?")
+        parameters.append(currency)
+    if min_salary is not None:
+        conditions.append("annual_gross_base_salary >= ?")
+        parameters.append(min_salary)
+    if max_salary is not None:
+        conditions.append("annual_gross_base_salary <= ?")
+        parameters.append(max_salary)
 
     where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
     total = connection.execute(
@@ -180,6 +197,7 @@ def list_employees(
             employee_id,
             name,
             department,
+            designation,
             country,
             employment_status,
             annual_gross_base_salary,

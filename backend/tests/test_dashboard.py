@@ -41,11 +41,11 @@ def _insert_employees(employees: list[dict[str, object]]) -> None:
         for employee in employees:
             with connection:
                 connection.execute(
-                    """INSERT INTO employees (employee_id, name, department, country,
+                    """INSERT INTO employees (employee_id, name, department, designation, country,
                        employment_status, annual_gross_base_salary, currency)
-                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                     tuple(employee[key] for key in (
-                        "employee_id", "name", "department", "country",
+                        "employee_id", "name", "department", "designation", "country",
                         "employment_status", "annual_gross_base_salary", "currency"
                     )),
                 )
@@ -66,6 +66,7 @@ def _employee(
         "employee_id": employee_id,
         "name": f"Employee {employee_id}",
         "department": "Finance",
+        "designation": "Financial Analyst",
         "country": country,
         "employment_status": status,
         "annual_gross_base_salary": salary,

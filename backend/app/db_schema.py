@@ -2,6 +2,7 @@
 
 from app.constants import (
     EMPLOYMENT_STATUSES,
+    DESIGNATIONS_BY_DEPARTMENT,
     MAX_ANNUAL_GROSS_BASE_SALARY,
     SUPPORTED_CURRENCIES,
 )
@@ -31,6 +32,7 @@ def init_db() -> None:
                     employee_id TEXT PRIMARY KEY CHECK ({employee_id_check}),
                     name TEXT NOT NULL,
                     department TEXT NOT NULL,
+                    designation TEXT NOT NULL CHECK (length(trim(designation)) > 0),
                     country TEXT NOT NULL,
                     employment_status TEXT NOT NULL
                         CHECK (employment_status IN ({allowed_statuses})),
@@ -42,6 +44,31 @@ def init_db() -> None:
                 )
                 """
             )
+            columns = connection.execute(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = 'employees'"
+            ).fetchall() if connection.dialect == "postgresql" else connection.execute(
+                "PRAGMA table_info(employees)"
+            ).fetchall()
+            column_names = {row["column_name"] if connection.dialect == "postgresql" else row["name"] for row in columns}
+            if "designation" not in column_names:
+                connection.execute("ALTER TABLE employees ADD COLUMN designation TEXT")
+            for department, designations in DESIGNATIONS_BY_DEPARTMENT.items():
+                for index, designation in enumerate(designations):
+                    connection.execute(
+                        "UPDATE employees SET designation = ? WHERE department = ? "
+                        "AND CAST(SUBSTR(employee_id, 5) AS INTEGER) % 5 = ? "
+                        "AND (designation IS NULL OR length(trim(designation)) = 0)",
+                        (designation, department, index),
+                    )
+            connection.execute(
+                "UPDATE employees SET designation = 'Employee' "
+                "WHERE designation IS NULL OR length(trim(designation)) = 0"
+            )
+            if connection.dialect == "postgresql":
+                connection.execute(
+                    "ALTER TABLE employees ALTER COLUMN designation SET NOT NULL"
+                )
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_employees_country ON employees (country)"
             )
@@ -54,6 +81,10 @@ def init_db() -> None:
             )
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_employees_currency ON employees (currency)"
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_employees_currency_salary "
+                "ON employees (currency, annual_gross_base_salary)"
             )
     finally:
         connection.close()

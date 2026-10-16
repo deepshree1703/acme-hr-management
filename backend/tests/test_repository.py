@@ -24,6 +24,7 @@ def test_repository_queries_work_with_database_neutral_count_and_rounding(
             EmployeeCreate(
                 name="Alex Example",
                 department="Operations",
+                designation="Operations Analyst",
                 country="India",
                 employment_status="Active",
                 annual_gross_base_salary=60000.13,

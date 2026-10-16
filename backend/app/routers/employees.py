@@ -4,7 +4,7 @@ import math
 import re
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from app.constants import EMPLOYMENT_STATUSES, PAGE_SIZE
+from app.constants import EMPLOYMENT_STATUSES, PAGE_SIZE, SUPPORTED_CURRENCIES
 from app.database import DatabaseConnection, get_connection
 from app.repository import (
     DuplicateEmployeeError,
@@ -26,6 +26,7 @@ from app.schemas import (
 
 router = APIRouter(prefix="/employees", tags=["employees"])
 _STATUS_PATTERN = rf"^(?:{'|'.join(re.escape(value) for value in EMPLOYMENT_STATUSES)})$"
+_CURRENCY_PATTERN = rf"^(?:{'|'.join(re.escape(value) for value in SUPPORTED_CURRENCIES)})$"
 
 
 @router.get("", response_model=EmployeeListResponse)
@@ -34,10 +35,27 @@ def list_employees(
     country: str | None = None,
     department: str | None = None,
     employment_status: str | None = Query(default=None, pattern=_STATUS_PATTERN),
+    currency: str | None = Query(default=None, pattern=_CURRENCY_PATTERN),
+    min_salary: float | None = Query(default=None, ge=0),
+    max_salary: float | None = Query(default=None, ge=0),
     page: int = Query(default=1, ge=1),
     connection: DatabaseConnection = Depends(get_connection),
 ) -> EmployeeListResponse:
     """List employees using filters and fixed-size backend pagination."""
+    if (min_salary is not None and not math.isfinite(min_salary)) or (
+        max_salary is not None and not math.isfinite(max_salary)
+    ):
+        raise HTTPException(status_code=422, detail="Salary bounds must be finite numbers")
+    if (min_salary is not None or max_salary is not None) and currency is None:
+        raise HTTPException(
+            status_code=400,
+            detail="A currency filter is required when using a salary range",
+        )
+    if min_salary is not None and max_salary is not None and min_salary > max_salary:
+        raise HTTPException(
+            status_code=400,
+            detail="min_salary must be less than or equal to max_salary",
+        )
     items, total = repository_list_employees(
         connection,
         page=page,
@@ -45,6 +63,9 @@ def list_employees(
         country=country,
         department=department,
         employment_status=employment_status,
+        currency=currency,
+        min_salary=min_salary,
+        max_salary=max_salary,
     )
     return EmployeeListResponse(
         items=items,

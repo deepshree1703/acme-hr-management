@@ -43,6 +43,7 @@ def valid_employee_payload() -> dict[str, object]:
     return {
         "name": "Alex Example",
         "department": "Operations",
+        "designation": "Operations Analyst",
         "country": "India",
         "employment_status": "Active",
         "annual_gross_base_salary": 50000,
@@ -64,11 +65,11 @@ def _seed_employees(
         for employee in employees:
             with connection:
                 connection.execute(
-                    """INSERT INTO employees (employee_id, name, department, country,
+                    """INSERT INTO employees (employee_id, name, department, designation, country,
                        employment_status, annual_gross_base_salary, currency)
-                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                     tuple(employee[key] for key in (
-                        "employee_id", "name", "department", "country",
+                        "employee_id", "name", "department", "designation", "country",
                         "employment_status", "annual_gross_base_salary", "currency"
                     )),
                 )
@@ -535,6 +536,124 @@ def test_list_employees_returns_empty_results_with_zero_totals(
         "page_size": 20,
         "total_pages": 0,
     }
+
+
+def _salary_filter_employees() -> list[dict[str, object]]:
+    """Build a compact mixed-currency dataset for salary filter tests."""
+    specs = [
+        (1, "Alice Smith", "Sales", "Canada", "Active", "USD", 100),
+        (2, "Bob Jones", "Sales", "Canada", "Inactive", "USD", 200),
+        (3, "Carol Lee", "Engineering", "India", "Active", "USD", 300),
+        (4, "Alicia Morgan", "Sales", "Canada", "Active", "EUR", 150),
+        (5, "Alan Chen", "Engineering", "India", "Inactive", "EUR", 250),
+    ]
+    return [
+        valid_employee_payload() | {
+            "employee_id": f"EMP-{number:05d}",
+            "name": name,
+            "department": department,
+            "country": country,
+            "employment_status": status,
+            "currency": currency,
+            "annual_gross_base_salary": salary,
+        }
+        for number, name, department, country, status, currency, salary in specs
+    ]
+
+
+def _list_salary_filtered(
+    transport: ASGITransport, **params: str | int
+) -> dict[str, object]:
+    response = _request(transport, "GET", "/employees", params=params)
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def test_salary_filters_cover_currency_bounds_and_inclusive_edges(
+    api_transport: ASGITransport,
+) -> None:
+    _seed_employees(_salary_filter_employees())
+
+    assert [row["employee_id"] for row in _list_salary_filtered(
+        api_transport, currency="USD"
+    )["items"]] == ["EMP-00001", "EMP-00002", "EMP-00003"]
+    assert [row["employee_id"] for row in _list_salary_filtered(
+        api_transport, currency="USD", min_salary=200
+    )["items"]] == ["EMP-00002", "EMP-00003"]
+    assert [row["employee_id"] for row in _list_salary_filtered(
+        api_transport, currency="USD", max_salary=200
+    )["items"]] == ["EMP-00001", "EMP-00002"]
+    assert [row["employee_id"] for row in _list_salary_filtered(
+        api_transport, currency="USD", min_salary=200, max_salary=200
+    )["items"]] == ["EMP-00002"]
+
+
+def test_salary_ranges_are_scoped_to_currency(
+    api_transport: ASGITransport,
+) -> None:
+    _seed_employees(_salary_filter_employees())
+    usd = _list_salary_filtered(api_transport, currency="USD", min_salary=100, max_salary=200)
+    eur = _list_salary_filtered(api_transport, currency="EUR", min_salary=100, max_salary=200)
+    assert [row["employee_id"] for row in usd["items"]] == ["EMP-00001", "EMP-00002"]
+    assert [row["employee_id"] for row in eur["items"]] == ["EMP-00004"]
+
+
+def test_salary_range_combines_with_existing_filters(
+    api_transport: ASGITransport,
+) -> None:
+    _seed_employees(_salary_filter_employees())
+    result = _list_salary_filtered(
+        api_transport,
+        currency="USD",
+        min_salary=100,
+        max_salary=300,
+        department="Sales",
+        country="Canada",
+        search="alice",
+        employment_status="Active",
+    )
+    assert result["total"] == 1
+    assert [row["employee_id"] for row in result["items"]] == ["EMP-00001"]
+
+
+def test_salary_range_pagination_and_empty_result(
+    api_transport: ASGITransport, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.routers import employees as employee_routes
+
+    _seed_employees(_salary_filter_employees())
+    monkeypatch.setattr(employee_routes, "PAGE_SIZE", 2)
+    page = _list_salary_filtered(
+        api_transport, currency="USD", min_salary=100, page=2
+    )
+    assert page["total"] == 3
+    assert page["total_pages"] == 2
+    assert [row["employee_id"] for row in page["items"]] == ["EMP-00003"]
+
+    empty = _list_salary_filtered(api_transport, currency="EUR", min_salary=1000)
+    assert empty["items"] == []
+    assert empty["total"] == 0
+    assert empty["total_pages"] == 0
+
+
+@pytest.mark.parametrize(
+    ("params", "expected_status"),
+    [
+        ({"min_salary": 100}, 400),
+        ({"currency": "USD", "min_salary": 200, "max_salary": 100}, 400),
+        ({"currency": "XYZ"}, 422),
+        ({"currency": "USD", "min_salary": -1}, 422),
+        ({"currency": "USD", "min_salary": "inf"}, 422),
+        ({"currency": "USD", "max_salary": "nan"}, 422),
+    ],
+)
+def test_salary_filters_reject_invalid_ranges(
+    api_transport: ASGITransport,
+    params: dict[str, str | int],
+    expected_status: int,
+) -> None:
+    response = _request(api_transport, "GET", "/employees", params=params)
+    assert response.status_code == expected_status
 
 
 @pytest.mark.parametrize(

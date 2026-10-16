@@ -3,7 +3,7 @@
 import random
 from collections.abc import Iterator
 
-from app.constants import EMPLOYMENT_STATUSES, SUPPORTED_CURRENCIES
+from app.constants import DESIGNATIONS_BY_DEPARTMENT, EMPLOYMENT_STATUSES, SUPPORTED_CURRENCIES
 from app.database import connect
 from app.db_schema import init_db
 
@@ -60,6 +60,7 @@ LAST_NAMES = (
 def _employee_rows(count: int) -> Iterator[tuple[object, ...]]:
     """Yield deterministic employee records for the requested count."""
     rng = random.Random(RANDOM_SEED)
+    designation_rng = random.Random(RANDOM_SEED ^ 0xD3516A7E)
     currencies = set(SUPPORTED_CURRENCIES)
     if currencies != set(SALARY_RANGES):
         raise ValueError("Salary ranges must cover all supported currencies")
@@ -68,10 +69,12 @@ def _employee_rows(count: int) -> Iterator[tuple[object, ...]]:
         country, currency = rng.choice(COUNTRY_CURRENCIES)
         salary_min, salary_max = SALARY_RANGES[currency]
         status = rng.choices(EMPLOYMENT_STATUSES, weights=(90, 10), k=1)[0]
+        department = rng.choice(DEPARTMENTS)
         yield (
             f"EMP-{index:05d}",
             f"{rng.choice(FIRST_NAMES)} {rng.choice(LAST_NAMES)}",
-            rng.choice(DEPARTMENTS),
+            department,
+            designation_rng.choice(DESIGNATIONS_BY_DEPARTMENT[department]),
             country,
             status,
             rng.randint(salary_min, salary_max),
@@ -99,11 +102,12 @@ def seed_employees(count: int = EMPLOYEE_COUNT, batch_size: int = BATCH_SIZE) ->
                         employee_id,
                         name,
                         department,
+                        designation,
                         country,
                         employment_status,
                         annual_gross_base_salary,
                         currency
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(employee_id) DO NOTHING
                     """,
                     batch,
