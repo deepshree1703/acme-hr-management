@@ -620,9 +620,11 @@ def test_salary_range_pagination_and_empty_result(
     api_transport: ASGITransport, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from app.routers import employees as employee_routes
+    from app import repository as employee_repository
 
     _seed_employees(_salary_filter_employees())
     monkeypatch.setattr(employee_routes, "PAGE_SIZE", 2)
+    monkeypatch.setattr(employee_repository, "PAGE_SIZE", 2)
     page = _list_salary_filtered(
         api_transport, currency="USD", min_salary=100, page=2
     )
