@@ -60,12 +60,15 @@ td.salary { color: #182230; font-weight: 600; font-variant-numeric: tabular-nums
 .placeholder h1 { font-size: 24px; }
 .placeholder p { margin-bottom: 0; color: #667085; }
 .employee-panel { overflow: hidden; }
-.employee-toolbar { display: grid; grid-template-columns: minmax(210px, 1.6fr) repeat(3, minmax(135px, 1fr)); gap: 13px; padding: 20px 22px; border-bottom: 1px solid #edf0f4; }
+.employee-toolbar { display: grid; grid-template-columns: minmax(210px, 1.6fr) repeat(3, minmax(125px, 1fr)); gap: 13px; padding: 20px 22px; border-bottom: 1px solid #edf0f4; }
 .employee-toolbar label { display: flex; min-width: 0; flex-direction: column; gap: 7px; }
 .employee-toolbar label > span { color: #667085; font-size: 11px; font-weight: 600; }
 .employee-toolbar input, .employee-toolbar select { width: 100%; height: 38px; padding: 0 11px; border: 1px solid #d9e0e8; border-radius: 7px; outline: none; background: #fff; color: #344054; font: inherit; font-size: 12px; }
 .employee-toolbar input:focus, .employee-toolbar select:focus { border-color: #6a9af8; box-shadow: 0 0 0 3px rgb(52 120 246 / 12%); }
 .employee-toolbar input::placeholder { color: #a0aaba; }
+.employee-toolbar input:disabled { background: #f8fafc; color: #98a2b3; cursor: not-allowed; }
+.employee-toolbar .clear-filters { align-self: end; justify-self: start; }
+.salary-filter-hint { margin: 10px 22px 0; color: #667085; font-size: 11px; }
 .filter-error { margin: 12px 22px 0; color: #b54708; font-size: 12px; }
 .employee-table { min-width: 980px; }
 .employee-table th, .employee-table td { padding-right: 17px; padding-left: 17px; }
