@@ -106,15 +106,25 @@ class EmployeeListResponse(BaseModel):
 
 
 class CurrencySalarySummary(BaseModel):
-    """Employee count and average salary in one currency."""
+    """Employee count and salary statistics, all measured in one currency."""
 
     currency: str
     headcount: int
     average_annual_gross_base_salary: float
+    minimum_annual_gross_base_salary: float
+    maximum_annual_gross_base_salary: float
+
+
+class SalaryGroupSummary(BaseModel):
+    """Salary statistics for a department or country, split by currency."""
+
+    name: str
+    headcount: int
+    currencies: list[CurrencySalarySummary]
 
 
 class SalaryDashboardResponse(BaseModel):
-    """Salary summaries by currency and the overall employee headcount."""
+    """Filtered salary summaries by currency and overall employee headcount."""
 
     currencies: list[CurrencySalarySummary]
     total_headcount: int

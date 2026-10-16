@@ -8,6 +8,7 @@ from app.schemas import (
     EmployeeFilterOptions,
     EmployeeRead,
     EmployeeUpdate,
+    SalaryGroupSummary,
 )
 
 _EMPLOYEE_SELECT = """
@@ -213,22 +214,61 @@ def list_employees(
     return [EmployeeRead.model_validate(dict(row)) for row in rows], total
 
 
+_DASHBOARD_GROUP_COLUMNS = {
+    "department": "department",
+    "country": "country",
+}
+
+
+def _dashboard_filter_clause(
+    *, department: str | None, country: str | None, employment_status: str | None
+) -> tuple[str, list[str]]:
+    """Build parameterized equality filters shared by dashboard aggregates."""
+    conditions: list[str] = []
+    parameters: list[str] = []
+    for column, value in (
+        ("department", department),
+        ("country", country),
+        ("employment_status", employment_status),
+    ):
+        if value is not None:
+            conditions.append(f"{column} = ?")
+            parameters.append(value)
+    where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    return where_clause, parameters
+
+
 def get_salary_dashboard(
     connection: DatabaseConnection,
+    *,
+    department: str | None = None,
+    country: str | None = None,
+    employment_status: str | None = None,
 ) -> tuple[list[CurrencySalarySummary], int]:
-    """Return per-currency salary aggregates and the overall employee count."""
+    """Return filtered salary statistics per currency and filtered headcount."""
+    where_clause, parameters = _dashboard_filter_clause(
+        department=department,
+        country=country,
+        employment_status=employment_status,
+    )
+    total_headcount = connection.execute(
+        f"SELECT COUNT(*) AS total_headcount FROM employees {where_clause}",
+        parameters,
+    ).fetchone()["total_headcount"]
     rows = connection.execute(
-        """
+        f"""
         SELECT
             currency,
             COUNT(*) AS headcount,
             ROUND(AVG(CAST(annual_gross_base_salary AS NUMERIC)), 2)
                 AS average_annual_gross_base_salary,
-            (SELECT COUNT(*) FROM employees) AS total_headcount
-        FROM employees
+            MIN(annual_gross_base_salary) AS minimum_annual_gross_base_salary,
+            MAX(annual_gross_base_salary) AS maximum_annual_gross_base_salary
+        FROM employees {where_clause}
         GROUP BY currency
         ORDER BY currency
-        """
+        """,
+        parameters,
     ).fetchall()
     summaries = [
         CurrencySalarySummary(
@@ -237,11 +277,76 @@ def get_salary_dashboard(
             average_annual_gross_base_salary=row[
                 "average_annual_gross_base_salary"
             ],
+            minimum_annual_gross_base_salary=row[
+                "minimum_annual_gross_base_salary"
+            ],
+            maximum_annual_gross_base_salary=row[
+                "maximum_annual_gross_base_salary"
+            ],
         )
         for row in rows
     ]
-    total_headcount = rows[0]["total_headcount"] if rows else 0
     return summaries, total_headcount
+
+
+def get_salary_group_summaries(
+    connection: DatabaseConnection,
+    *,
+    group_by: str,
+    department: str | None = None,
+    country: str | None = None,
+    employment_status: str | None = None,
+) -> list[SalaryGroupSummary]:
+    """Return salary statistics grouped by a whitelisted field and currency."""
+    group_column = _DASHBOARD_GROUP_COLUMNS.get(group_by)
+    if group_column is None:
+        raise ValueError("Unsupported salary summary grouping")
+    where_clause, parameters = _dashboard_filter_clause(
+        department=department,
+        country=country,
+        employment_status=employment_status,
+    )
+    rows = connection.execute(
+        f"""
+        SELECT
+            {group_column} AS group_name,
+            currency,
+            COUNT(*) AS headcount,
+            ROUND(AVG(CAST(annual_gross_base_salary AS NUMERIC)), 2)
+                AS average_annual_gross_base_salary,
+            MIN(annual_gross_base_salary) AS minimum_annual_gross_base_salary,
+            MAX(annual_gross_base_salary) AS maximum_annual_gross_base_salary
+        FROM employees {where_clause}
+        GROUP BY {group_column}, currency
+        ORDER BY {group_column}, currency
+        """,
+        parameters,
+    ).fetchall()
+
+    grouped: dict[str, list[CurrencySalarySummary]] = {}
+    headcounts: dict[str, int] = {}
+    for row in rows:
+        name = row["group_name"]
+        grouped.setdefault(name, []).append(
+            CurrencySalarySummary(
+                currency=row["currency"],
+                headcount=row["headcount"],
+                average_annual_gross_base_salary=row[
+                    "average_annual_gross_base_salary"
+                ],
+                minimum_annual_gross_base_salary=row[
+                    "minimum_annual_gross_base_salary"
+                ],
+                maximum_annual_gross_base_salary=row[
+                    "maximum_annual_gross_base_salary"
+                ],
+            )
+        )
+        headcounts[name] = headcounts.get(name, 0) + row["headcount"]
+    return [
+        SalaryGroupSummary(name=name, headcount=headcounts[name], currencies=currencies)
+        for name, currencies in grouped.items()
+    ]
 
 
 def get_employee_filter_options(
