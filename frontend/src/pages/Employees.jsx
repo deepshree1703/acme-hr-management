@@ -82,9 +82,21 @@ const EMPLOYEE_FIELDS = [
 /** Render the employee create/edit form and handle its validation and submission. */
 function EmployeeForm({ employee, filters, onClose, onSaved }) {
   const editing = Boolean(employee);
-  const [values, setValues] = useState(() => employee
-    ? { ...employee, annual_gross_base_salary: String(employee.annual_gross_base_salary) }
-    : { ...EMPTY_EMPLOYEE });
+  const designationsByDepartment = filters?.designations_by_department || {};
+  const [values, setValues] = useState(() => {
+    if (!employee) return { ...EMPTY_EMPLOYEE };
+    const initial = {
+      ...employee,
+      annual_gross_base_salary: String(employee.annual_gross_base_salary),
+    };
+    if (!Object.prototype.hasOwnProperty.call(designationsByDepartment, initial.department)) {
+      initial.department = "";
+    }
+    if (!(designationsByDepartment[initial.department] || []).includes(initial.designation)) {
+      initial.designation = "";
+    }
+    return initial;
+  });
   const [fieldErrors, setFieldErrors] = useState({});
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -113,6 +125,22 @@ function EmployeeForm({ employee, filters, onClose, onSaved }) {
   function setValue(name, value) {
     setValues((current) => ({ ...current, [name]: value }));
     setFieldErrors((current) => ({ ...current, [name]: undefined }));
+    setFormError("");
+  }
+
+  /** Change departments and retain only a designation valid for the new choice. */
+  function setDepartment(value) {
+    const choices = designationsByDepartment[value] || [];
+    setValues((current) => ({
+      ...current,
+      department: value,
+      designation: choices.includes(current.designation) ? current.designation : "",
+    }));
+    setFieldErrors((current) => ({
+      ...current,
+      department: undefined,
+      designation: undefined,
+    }));
     setFormError("");
   }
 
@@ -220,14 +248,35 @@ function EmployeeForm({ employee, filters, onClose, onSaved }) {
       "aria-describedby": fieldErrors[name] ? `employee-${name}-error` : undefined,
     };
     let control;
-    if (name === "employment_status" || name === "currency") {
+    if (name === "department") {
+      control = <select
+        {...common}
+        required
+        onChange={(event) => setDepartment(event.target.value)}
+      >
+        <option value="">Select department</option>
+        {Object.keys(designationsByDepartment).map((department) => (
+          <option value={department} key={department}>{department}</option>
+        ))}
+      </select>;
+    } else if (name === "designation") {
+      const options = designationsByDepartment[values.department] || [];
+      control = <select {...common} required disabled={saving || !values.department}>
+        <option value="">
+          {values.department ? "Select designation" : "Select a department first"}
+        </option>
+        {options.map((designation) => (
+          <option value={designation} key={designation}>{designation}</option>
+        ))}
+      </select>;
+    } else if (name === "employment_status" || name === "currency") {
       const options = name === "currency" ? filters?.currencies : filters?.employment_statuses;
       control = <select {...common} required>
         {(options || []).map((option) => <option value={option} key={option}>{option}</option>)}
       </select>;
-    } else if (name === "department" || name === "country") {
+    } else if (name === "country") {
       const listId = `employee-${name}-options`;
-      const options = name === "department" ? filters?.departments : filters?.countries;
+      const options = filters?.countries;
       control = <>
         <input {...common} list={listId} required />
         <datalist id={listId}>{(options || []).map((option) => <option value={option} key={option} />)}</datalist>
