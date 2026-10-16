@@ -1,6 +1,11 @@
 """Parameterized employee persistence operations."""
 
-from app.constants import EMPLOYMENT_STATUSES, PAGE_SIZE, SUPPORTED_CURRENCIES
+from app.constants import (
+    DESIGNATIONS_BY_DEPARTMENT,
+    EMPLOYMENT_STATUSES,
+    PAGE_SIZE,
+    SUPPORTED_CURRENCIES,
+)
 from app.database import DatabaseConnection
 from app.schemas import (
     CurrencySalarySummary,
@@ -364,4 +369,8 @@ def get_employee_filter_options(
         departments=[row["department"] for row in departments],
         employment_statuses=list(EMPLOYMENT_STATUSES),
         currencies=list(SUPPORTED_CURRENCIES),
+        designations_by_department={
+            department: list(designations)
+            for department, designations in DESIGNATIONS_BY_DEPARTMENT.items()
+        },
     )
