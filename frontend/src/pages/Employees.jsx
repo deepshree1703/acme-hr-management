@@ -13,6 +13,34 @@ import { formatSalary } from "../format.js";
 const MAX_SALARY = 9999999999.99;
 const SALARY_LIMIT_MESSAGE = "Salary can have at most 10 digits before the decimal and 2 after (maximum 9999999999.99).";
 
+// Keep this map in sync with backend/scripts/seed.py.
+const COUNTRY_CURRENCIES = {
+  "United States": "USD",
+  Germany: "EUR",
+  "United Kingdom": "GBP",
+  India: "INR",
+  Canada: "CAD",
+  Australia: "AUD",
+  Singapore: "SGD",
+  Japan: "JPY",
+};
+
+function getCountryCurrency(country) {
+  const matchedCountry = Object.keys(COUNTRY_CURRENCIES).find(
+    (name) => name.toLowerCase() === country.trim().toLowerCase(),
+  );
+  return matchedCountry ? { country: matchedCountry, currency: COUNTRY_CURRENCIES[matchedCountry] } : null;
+}
+
+function getCountrySuggestions(countries = []) {
+  const suggestions = new Map();
+  for (const country of [...Object.keys(COUNTRY_CURRENCIES), ...countries]) {
+    const key = country.trim().toLowerCase();
+    if (key && !suggestions.has(key)) suggestions.set(key, country);
+  }
+  return [...suggestions.values()];
+}
+
 /** Parse a positive page number, defaulting invalid values to page one. */
 function readPage(value) {
   const parsed = Number.parseInt(value || "1", 10);
@@ -114,6 +142,24 @@ function EmployeeForm({ employee, filters, onClose, onSaved }) {
     setValues((current) => ({ ...current, [name]: value }));
     setFieldErrors((current) => ({ ...current, [name]: undefined }));
     setFormError("");
+  }
+
+  /** Update country text and fill its currency when it is a common country. */
+  function setCountry(value) {
+    const match = getCountryCurrency(value);
+    setValues((current) => ({
+      ...current,
+      country: value,
+      ...(match ? { currency: match.currency } : {}),
+    }));
+    setFieldErrors((current) => ({ ...current, country: undefined }));
+    setFormError("");
+  }
+
+  /** Canonicalize recognized country names after the user leaves the field. */
+  function canonicalizeCountry(value) {
+    const match = getCountryCurrency(value);
+    if (match) setValues((current) => ({ ...current, country: match.country }));
   }
 
   /** Change departments and retain only a designation valid for the new choice. */
@@ -264,9 +310,15 @@ function EmployeeForm({ employee, filters, onClose, onSaved }) {
       </select>;
     } else if (name === "country") {
       const listId = `employee-${name}-options`;
-      const options = filters?.countries;
+      const options = getCountrySuggestions(filters?.countries);
       control = <>
-        <input {...common} list={listId} required />
+        <input
+          {...common}
+          list={listId}
+          required
+          onChange={(event) => setCountry(event.target.value)}
+          onBlur={(event) => canonicalizeCountry(event.target.value)}
+        />
         <datalist id={listId}>{(options || []).map((option) => <option value={option} key={option} />)}</datalist>
       </>;
     } else {
@@ -283,6 +335,7 @@ function EmployeeForm({ employee, filters, onClose, onSaved }) {
       <span>{label}</span>
       {control}
       {name === "annual_gross_base_salary" && <small className="field-hint">Up to 10 digits before the decimal and 2 after.</small>}
+      {name === "currency" && <small className="field-hint">Filled in automatically for common countries. You can change it.</small>}
       {fieldErrors[name] && <small className="field-error" id={`employee-${name}-error`}>{fieldErrors[name]}</small>}
     </label>;
   }
