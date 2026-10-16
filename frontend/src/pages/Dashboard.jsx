@@ -5,19 +5,7 @@ import {
   getDashboardByDepartment,
   getEmployeeFilterOptions,
 } from "../api.js";
-
-/** Format a salary as currency, falling back when the currency is unsupported. */
-function formatSalary(amount, currency) {
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  } catch {
-    return `${amount.toLocaleString()} ${currency}`;
-  }
-}
+import { formatSalary } from "../format.js";
 
 const EMPTY_FILTERS = {
   department: "",
