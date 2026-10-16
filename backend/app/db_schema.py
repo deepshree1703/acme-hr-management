@@ -6,7 +6,53 @@ from app.constants import (
     MAX_ANNUAL_GROSS_BASE_SALARY,
     SUPPORTED_CURRENCIES,
 )
-from app.database import connect
+from app.database import DatabaseConnection, connect
+
+_MIGRATION_BATCH_SIZE = 500
+
+
+def _designation_column_rows(connection: DatabaseConnection):
+    """Add the designation column where needed and return its metadata."""
+    if connection.dialect == "postgresql":
+        connection.execute(
+            "ALTER TABLE employees ADD COLUMN IF NOT EXISTS designation TEXT"
+        )
+        return connection.execute(
+            "SELECT column_name, is_nullable FROM information_schema.columns "
+            "WHERE table_schema = current_schema() AND table_name = 'employees'"
+        ).fetchall()
+
+    columns = connection.execute("PRAGMA table_info(employees)").fetchall()
+    if not any(column["name"] == "designation" for column in columns):
+        try:
+            connection.execute("ALTER TABLE employees ADD COLUMN designation TEXT")
+        except Exception as exc:
+            # SQLite has no ADD COLUMN IF NOT EXISTS; concurrent initializers may race.
+            if "duplicate column name" not in str(exc).lower():
+                raise
+        columns = connection.execute("PRAGMA table_info(employees)").fetchall()
+    return columns
+
+
+def _backfill_designations(connection: DatabaseConnection) -> None:
+    """Fill only missing designations using employee IDs and department lists."""
+    rows = connection.execute(
+        "SELECT employee_id, department FROM employees "
+        "WHERE designation IS NULL OR trim(designation) = ''"
+    ).fetchall()
+    if not rows:
+        return
+
+    updates: list[tuple[str, str]] = []
+    for row in rows:
+        choices = DESIGNATIONS_BY_DEPARTMENT.get(row["department"])
+        designation = choices[int(row["employee_id"][4:]) % 5] if choices else "Employee"
+        updates.append((designation, row["employee_id"]))
+    for offset in range(0, len(updates), _MIGRATION_BATCH_SIZE):
+        connection.executemany(
+            "UPDATE employees SET designation = ? WHERE employee_id = ?",
+            updates[offset : offset + _MIGRATION_BATCH_SIZE],
+        )
 
 
 def init_db() -> None:
@@ -44,28 +90,12 @@ def init_db() -> None:
                 )
                 """
             )
-            columns = connection.execute(
-                "SELECT column_name FROM information_schema.columns "
-                "WHERE table_name = 'employees'"
-            ).fetchall() if connection.dialect == "postgresql" else connection.execute(
-                "PRAGMA table_info(employees)"
-            ).fetchall()
-            column_names = {row["column_name"] if connection.dialect == "postgresql" else row["name"] for row in columns}
-            if "designation" not in column_names:
-                connection.execute("ALTER TABLE employees ADD COLUMN designation TEXT")
-            for department, designations in DESIGNATIONS_BY_DEPARTMENT.items():
-                for index, designation in enumerate(designations):
-                    connection.execute(
-                        "UPDATE employees SET designation = ? WHERE department = ? "
-                        "AND CAST(SUBSTR(employee_id, 5) AS INTEGER) % 5 = ? "
-                        "AND (designation IS NULL OR length(trim(designation)) = 0)",
-                        (designation, department, index),
-                    )
-            connection.execute(
-                "UPDATE employees SET designation = 'Employee' "
-                "WHERE designation IS NULL OR length(trim(designation)) = 0"
-            )
-            if connection.dialect == "postgresql":
+            columns = _designation_column_rows(connection)
+            _backfill_designations(connection)
+            if connection.dialect == "postgresql" and any(
+                row["column_name"] == "designation" and row["is_nullable"] == "YES"
+                for row in columns
+            ):
                 connection.execute(
                     "ALTER TABLE employees ALTER COLUMN designation SET NOT NULL"
                 )
