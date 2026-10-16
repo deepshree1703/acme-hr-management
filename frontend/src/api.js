@@ -47,9 +47,31 @@ async function request(path, options = {}) {
   return body;
 }
 
-/** Load salary summaries and overall headcount. */
-export function getDashboard() {
-  return request("/dashboard");
+/** Build a query string containing only selected dashboard filters. */
+function dashboardQuery(filters = {}) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value !== "" && value !== undefined && value !== null) {
+      query.set(key, String(value));
+    }
+  }
+  const serialized = query.toString();
+  return serialized ? `?${serialized}` : "";
+}
+
+/** Load currency salary summaries and total headcount for the selected filters. */
+export function getDashboard(filters = {}) {
+  return request(`/dashboard${dashboardQuery(filters)}`);
+}
+
+/** Load salary summaries grouped by department for the selected filters. */
+export function getDashboardByDepartment(filters = {}) {
+  return request(`/dashboard/by-department${dashboardQuery(filters)}`);
+}
+
+/** Load salary summaries grouped by country for the selected filters. */
+export function getDashboardByCountry(filters = {}) {
+  return request(`/dashboard/by-country${dashboardQuery(filters)}`);
 }
 
 /** Load the values available for employee filters and form selections. */
