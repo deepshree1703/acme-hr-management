@@ -56,7 +56,7 @@ th { padding: 11px 24px; color: #8290a3; font-size: 10px; font-weight: 700; lett
 td { padding: 14px 24px; border-top: 1px solid #edf0f4; color: #4b586b; font-size: 13px; }
 th.numeric, td.numeric { text-align: right; }
 .currency-code { display: inline-block; min-width: 44px; color: #344054; font-size: 11px; font-weight: 700; letter-spacing: .5px; }
-td.salary { color: #182230; font-weight: 600; font-variant-numeric: tabular-nums; }
+td.salary { color: #182230; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .table-note { margin: 0; padding: 13px 24px 16px; border-top: 1px solid #edf0f4; color: #8a95a5; font-size: 11px; }
 .message { padding: 24px; color: #667085; }
 .message.error { border: 1px solid #fecaca; border-radius: 10px; background: #fff7f7; color: #b42318; }
