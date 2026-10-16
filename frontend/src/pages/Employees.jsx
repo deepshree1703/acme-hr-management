@@ -37,9 +37,32 @@ const FILTERS = [
   ["employment_status", "Employment status", "employment_statuses"],
 ];
 
+/** Return a readable error for invalid currency-scoped salary bounds. */
+function salaryRangeError({ currency, min_salary: minSalary, max_salary: maxSalary }) {
+  const hasMin = minSalary !== "";
+  const hasMax = maxSalary !== "";
+  const minimum = Number(minSalary);
+  const maximum = Number(maxSalary);
+
+  if (hasMin && (!Number.isFinite(minimum) || minimum < 0)) {
+    return "Minimum salary must be a finite number of at least 0.";
+  }
+  if (hasMax && (!Number.isFinite(maximum) || maximum < 0)) {
+    return "Maximum salary must be a finite number of at least 0.";
+  }
+  if ((hasMin || hasMax) && !currency) {
+    return "Select a currency to filter by salary.";
+  }
+  if (hasMin && hasMax && minimum > maximum) {
+    return "Minimum salary must be less than or equal to maximum salary.";
+  }
+  return "";
+}
+
 const EMPTY_EMPLOYEE = {
   name: "",
   department: "",
+  designation: "",
   country: "",
   employment_status: "Active",
   annual_gross_base_salary: "",
@@ -49,6 +72,7 @@ const EMPTY_EMPLOYEE = {
 const EMPLOYEE_FIELDS = [
   ["name", "Name"],
   ["department", "Department"],
+  ["designation", "Designation"],
   ["country", "Country"],
   ["employment_status", "Employment status"],
   ["annual_gross_base_salary", "Annual salary"],
@@ -144,6 +168,7 @@ function EmployeeForm({ employee, filters, onClose, onSaved }) {
     const payload = {
       name: values.name.trim(),
       department: values.department.trim(),
+      designation: values.designation.trim(),
       country: values.country.trim(),
       employment_status: values.employment_status,
       annual_gross_base_salary: Number(rawSalary),
@@ -280,6 +305,9 @@ export default function Employees() {
       country: params.get("country") || "",
       department: params.get("department") || "",
       employment_status: params.get("employment_status") || "",
+      currency: params.get("currency") || "",
+      min_salary: params.get("min_salary") || "",
+      max_salary: params.get("max_salary") || "",
       page: readPage(params.get("page")),
     };
   }, [queryString]);
@@ -296,6 +324,7 @@ export default function Employees() {
   const [deletingId, setDeletingId] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const requestSequence = useRef(0);
+  const rangeError = salaryRangeError(urlState);
 
   // Keep the input responsive while committing the search to the URL after typing pauses.
   useEffect(() => {
@@ -325,6 +354,11 @@ export default function Employees() {
   useEffect(() => {
     const sequence = ++requestSequence.current;
     let active = true;
+    if (salaryRangeError(urlState)) {
+      setLoading(false);
+      setError("");
+      return () => { active = false; };
+    }
     setLoading(true);
     setError("");
     getEmployees(urlState)
@@ -379,8 +413,19 @@ export default function Employees() {
     const next = new URLSearchParams(queryString);
     if (value) next.set(name, value);
     else next.delete(name);
+    if (name === "currency" && !value) {
+      next.delete("min_salary");
+      next.delete("max_salary");
+    }
     next.delete("page");
     setSearchParams(next);
+  }
+
+  /** Clear search, filters, and pagination together. */
+  function clearFilters() {
+    requestSequence.current += 1;
+    setSearchInput("");
+    setSearchParams(new URLSearchParams());
   }
 
   /** Navigate to a page while preserving the current URL filters. */
@@ -436,8 +481,58 @@ export default function Employees() {
               </select>
             </label>
           ))}
+          <label className="filter-field" htmlFor="employee-currency-filter">
+            <span>Currency</span>
+            <select
+              id="employee-currency-filter"
+              value={urlState.currency}
+              onChange={(event) => updateFilter("currency", event.target.value)}
+              disabled={!filters}
+            >
+              <option value="">All</option>
+              {(filters?.currencies || []).map((currency) => (
+                <option value={currency} key={currency}>{currency}</option>
+              ))}
+            </select>
+          </label>
+          <label className="filter-field" htmlFor="employee-min-salary-filter">
+            <span>Min salary</span>
+            <input
+              id="employee-min-salary-filter"
+              type="number"
+              min="0"
+              step="any"
+              value={urlState.min_salary}
+              onChange={(event) => updateFilter("min_salary", event.target.value)}
+              disabled={!urlState.currency}
+            />
+          </label>
+          <label className="filter-field" htmlFor="employee-max-salary-filter">
+            <span>Max salary</span>
+            <input
+              id="employee-max-salary-filter"
+              type="number"
+              min="0"
+              step="any"
+              value={urlState.max_salary}
+              onChange={(event) => updateFilter("max_salary", event.target.value)}
+              disabled={!urlState.currency}
+            />
+          </label>
+          <button
+            className="button-secondary clear-filters"
+            type="button"
+            onClick={clearFilters}
+            disabled={!searchInput.trim() && !urlState.search && !urlState.country && !urlState.department &&
+              !urlState.employment_status && !urlState.currency && !urlState.min_salary &&
+              !urlState.max_salary && urlState.page === 1}
+          >
+            Clear filters
+          </button>
         </div>
 
+        {urlState.currency === "" && <p className="salary-filter-hint">Select a currency to filter by salary.</p>}
+        {rangeError && <p className="filter-error" role="alert">{rangeError}</p>}
         {filterError && <p className="filter-error" role="alert">Filter options: {filterError}</p>}
 
         {error ? (
@@ -451,7 +546,7 @@ export default function Employees() {
             <table className="employee-table">
               <thead>
                 <tr>
-                  <th>Employee ID</th><th>Name</th><th>Department</th><th>Country</th><th>Status</th><th className="numeric">Annual salary</th><th className="actions-heading">Actions</th>
+                  <th>Employee ID</th><th>Name</th><th>Department</th><th>Designation</th><th>Country</th><th>Status</th><th className="numeric">Annual salary</th><th className="actions-heading">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -460,6 +555,7 @@ export default function Employees() {
                     <td className="employee-id">{employee.employee_id}</td>
                     <td className="employee-name">{employee.name}</td>
                     <td>{employee.department}</td>
+                    <td>{employee.designation}</td>
                     <td>{employee.country}</td>
                     <td><span className={`status-pill ${employee.employment_status.toLowerCase()}`}>{employee.employment_status}</span></td>
                     <td className="numeric salary">{formatSalary(employee.annual_gross_base_salary, employee.currency)} <span className="salary-currency">{employee.currency}</span></td>
