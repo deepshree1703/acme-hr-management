@@ -40,6 +40,11 @@ h1 { margin-bottom: 7px; font-size: 29px; font-weight: 700; }
 .metric-value { margin-bottom: 2px; font: 800 25px Arial, sans-serif; letter-spacing: -.5px; }
 .metric-caption { margin-bottom: 0; color: #98a2b3; font-size: 11px; }
 .summary-panel { overflow: hidden; }
+.dashboard-filters { margin-bottom: 25px; }
+.breakdown-panel { margin-top: 25px; }
+.breakdown-selector { display: flex; min-width: 145px; flex-direction: column; gap: 7px; }
+.breakdown-selector > span { color: #667085; font-size: 11px; font-weight: 600; }
+.breakdown-selector select { height: 36px; padding: 0 10px; border: 1px solid #d9e0e8; border-radius: 7px; background: #fff; color: #344054; font: inherit; font-size: 12px; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; padding: 22px 24px 19px; }
 .section-heading h2 { margin-bottom: 4px; font-size: 16px; font-weight: 700; }
 .section-heading p { margin-bottom: 0; color: #8792a2; font-size: 12px; }
