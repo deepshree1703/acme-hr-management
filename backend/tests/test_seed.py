@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from app import database
+from app.constants import DESIGNATIONS_BY_DEPARTMENT
 from app.database import connect
 from scripts import seed as seed_module
 from scripts.seed import seed_employees
@@ -30,9 +31,13 @@ def test_seed_is_repeatable_with_a_small_employee_count(
         ).fetchone()
         assert tuple(rows) == (12, 12)
         designations = connection.execute(
-            "SELECT COUNT(*) AS total, COUNT(designation) AS assigned FROM employees"
-        ).fetchone()
-        assert designations["total"] == designations["assigned"] == 12
+            "SELECT department, designation FROM employees ORDER BY employee_id"
+        ).fetchall()
+        assert len(designations) == 12
+        assert all(
+            row["designation"] in DESIGNATIONS_BY_DEPARTMENT[row["department"]]
+            for row in designations
+        )
         id_bounds = connection.execute(
             "SELECT MIN(employee_id), MAX(employee_id) FROM employees"
         ).fetchone()

@@ -5,7 +5,11 @@ import asyncio
 import pytest
 from httpx2 import ASGITransport, AsyncClient, Response
 
-from app.constants import EMPLOYMENT_STATUSES, SUPPORTED_CURRENCIES
+from app.constants import (
+    DESIGNATIONS_BY_DEPARTMENT,
+    EMPLOYMENT_STATUSES,
+    SUPPORTED_CURRENCIES,
+)
 from app.db_schema import init_db
 from app.database import connect
 from app.main import app
@@ -254,7 +258,14 @@ def test_employee_filter_options_return_distinct_values_and_supported_options(
         "departments": ["Engineering", "Finance"],
         "employment_statuses": list(EMPLOYMENT_STATUSES),
         "currencies": list(SUPPORTED_CURRENCIES),
+        "designations_by_department": {
+            department: list(designations)
+            for department, designations in DESIGNATIONS_BY_DEPARTMENT.items()
+        },
     }
+    designation_options = response.json()["designations_by_department"]
+    assert len(designation_options) == 8
+    assert all(len(designations) == 5 for designations in designation_options.values())
 
 
 def test_update_employee_returns_replacement_record(api_transport: ASGITransport) -> None:
@@ -265,6 +276,7 @@ def test_update_employee_returns_replacement_record(api_transport: ASGITransport
         {
             "name": "Jordan Example",
             "department": "Finance",
+            "designation": "Financial Analyst",
             "country": "Canada",
             "employment_status": "Inactive",
             "annual_gross_base_salary": 72000,
@@ -280,6 +292,66 @@ def test_update_employee_returns_replacement_record(api_transport: ASGITransport
         **payload,
         "annual_gross_base_salary": 72000.0,
     }
+
+
+@pytest.mark.parametrize("method", ["POST", "PUT"])
+@pytest.mark.parametrize(
+    ("department", "designation", "field"),
+    [
+        ("Engineering", "XYZ", "designation"),
+        ("Finance", "Software Engineer", "designation"),
+        ("Unknown Department", "XYZ", "department"),
+    ],
+)
+def test_create_and_update_reject_uncontrolled_department_designation(
+    api_transport: ASGITransport,
+    method: str,
+    department: str,
+    designation: str,
+    field: str,
+) -> None:
+    if method == "PUT":
+        _request(api_transport, "POST", "/employees", valid_employee_payload())
+    payload = valid_employee_payload() | {
+        "department": department,
+        "designation": designation,
+    }
+    path = "/employees" if method == "POST" else "/employees/EMP-00001"
+    response = _request(api_transport, method, path, payload)
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"][-1] == field
+    assert f"{field.capitalize()} must be one of:" in response.json()["detail"][0]["msg"]
+
+
+def test_legacy_employee_values_remain_readable_and_can_be_corrected(
+    api_transport: ASGITransport,
+) -> None:
+    _seed_employees([
+        valid_employee_payload() | {
+            "employee_id": "EMP-00001",
+            "department": "Legacy Department",
+            "designation": "Employee",
+        }
+    ])
+
+    fetched = _request(api_transport, "GET", "/employees/EMP-00001")
+    listed = _request(api_transport, "GET", "/employees")
+    assert fetched.status_code == listed.status_code == 200
+    assert fetched.json()["designation"] == "Employee"
+    assert listed.json()["items"][0]["department"] == "Legacy Department"
+
+    updated = _request(
+        api_transport,
+        "PUT",
+        "/employees/EMP-00001",
+        valid_employee_payload() | {
+            "department": "Engineering",
+            "designation": "Software Engineer",
+        },
+    )
+    assert updated.status_code == 200
+    assert updated.json()["department"] == "Engineering"
+    assert updated.json()["designation"] == "Software Engineer"
 
 
 def test_update_missing_employee_returns_not_found(

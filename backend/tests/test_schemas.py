@@ -32,6 +32,47 @@ def test_employee_models_accept_valid_data_and_trim_required_text() -> None:
     assert created.annual_gross_base_salary == 0
 
 
+def test_create_and_update_accept_a_valid_department_designation_pair() -> None:
+    for model in (EmployeeCreate, EmployeeUpdate):
+        employee = model(**(VALID_CREATE | {
+            "department": "  Finance ",
+            "designation": "  Financial Analyst  ",
+        }))
+        assert employee.department == "Finance"
+        assert employee.designation == "Financial Analyst"
+
+
+@pytest.mark.parametrize("model", [EmployeeCreate, EmployeeUpdate])
+@pytest.mark.parametrize(
+    ("department", "designation", "field"),
+    [
+        ("Engineering", "XYZ", "designation"),
+        ("Finance", "Software Engineer", "designation"),
+        ("Unknown Department", "XYZ", "department"),
+    ],
+)
+def test_create_and_update_reject_uncontrolled_department_designation(
+    model, department, designation, field
+) -> None:
+    with pytest.raises(ValidationError) as error:
+        model(**(VALID_CREATE | {
+            "department": department,
+            "designation": designation,
+        }))
+    assert error.value.errors()[0]["loc"] == (field,)
+    assert f"{field.capitalize()} must be one of:" in error.value.errors()[0]["msg"]
+
+
+def test_employee_read_allows_legacy_department_and_designation_values() -> None:
+    employee = EmployeeRead(**(VALID_CREATE | {
+        "department": "Legacy Department",
+        "designation": "Employee",
+        "employee_id": "EMP-00001",
+    }))
+    assert employee.department == "Legacy Department"
+    assert employee.designation == "Employee"
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [
