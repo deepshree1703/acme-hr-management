@@ -63,6 +63,8 @@ npm run dev
 
 Open the local URL printed by Vite (normally `http://localhost:5173`). The API URL defaults to `http://localhost:8000`; set `VITE_API_URL` in `frontend/.env` to point to another backend. Restart Vite after changing environment variables. The dashboard shows headcount and average salary by currency; averages remain in their own currencies and are not combined.
 
+The frontend uses `frontend/public/favicon.svg` as its browser tab icon.
+
 ## Database
 
 SQLite is used for local development when `DATABASE_URL` is unset. Supabase PostgreSQL is used for deployment when `DATABASE_URL` is configured. The employees table is initialized when the backend starts.
