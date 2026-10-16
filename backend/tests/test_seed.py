@@ -29,6 +29,10 @@ def test_seed_is_repeatable_with_a_small_employee_count(
             "SELECT COUNT(*), COUNT(DISTINCT employee_id) FROM employees"
         ).fetchone()
         assert tuple(rows) == (12, 12)
+        designations = connection.execute(
+            "SELECT COUNT(*) AS total, COUNT(designation) AS assigned FROM employees"
+        ).fetchone()
+        assert designations["total"] == designations["assigned"] == 12
         id_bounds = connection.execute(
             "SELECT MIN(employee_id), MAX(employee_id) FROM employees"
         ).fetchone()
@@ -102,4 +106,4 @@ def test_seed_counts_batches_when_psycopg_executemany_returns_none(
         1,
     ]
     assert len(statements) == 3
-    assert all(sql.count("%s") == 7 for sql in statements)
+    assert all(sql.count("%s") == 8 for sql in statements)

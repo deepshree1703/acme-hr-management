@@ -21,12 +21,13 @@ class EmployeeFields(BaseModel):
 
     name: str
     department: str
+    designation: str
     country: str
     employment_status: str
     annual_gross_base_salary: float = Field(allow_inf_nan=False)
     currency: str
 
-    @field_validator("name", "department", "country")
+    @field_validator("name", "department", "designation", "country")
     @classmethod
     def trim_nonblank_text(cls, value: str) -> str:
         """Trim text fields and reject values that are blank after trimming."""

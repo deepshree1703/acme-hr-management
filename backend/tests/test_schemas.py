@@ -9,6 +9,7 @@ from app.schemas import EmployeeCreate, EmployeeRead, EmployeeUpdate
 VALID_CREATE = {
     "name": "  Alex Example  ",
     "department": "  Operations ",
+    "designation": "  Operations Analyst ",
     "country": " India ",
     "employment_status": "Active",
     "annual_gross_base_salary": 0,
@@ -26,6 +27,7 @@ def test_employee_models_accept_valid_data_and_trim_required_text() -> None:
 
     assert created.name == updated.name == read.name == "Alex Example"
     assert created.department == "Operations"
+    assert created.designation == "Operations Analyst"
     assert created.country == "India"
     assert created.annual_gross_base_salary == 0
 
@@ -35,6 +37,7 @@ def test_employee_models_accept_valid_data_and_trim_required_text() -> None:
     [
         ("name", "   "),
         ("department", ""),
+        ("designation", "   "),
         ("country", "  "),
         ("employment_status", "On leave"),
         ("annual_gross_base_salary", -0.01),
@@ -62,6 +65,34 @@ def test_employee_update_requires_fields_and_rejects_employee_id() -> None:
     del incomplete_payload["name"]
     with pytest.raises(ValidationError):
         EmployeeUpdate(**incomplete_payload)
+
+    missing_designation = VALID_UPDATE.copy()
+    del missing_designation["designation"]
+    with pytest.raises(ValidationError):
+        EmployeeUpdate(**missing_designation)
+
+
+def test_employee_create_requires_designation() -> None:
+    payload = VALID_CREATE.copy()
+    del payload["designation"]
+    with pytest.raises(ValidationError):
+        EmployeeCreate(**payload)
+
+
+@pytest.mark.parametrize("model", [EmployeeCreate, EmployeeUpdate])
+@pytest.mark.parametrize("designation", ["", "   "])
+def test_employee_create_and_update_require_nonblank_designation(model, designation) -> None:
+    payload = VALID_CREATE | {"designation": designation}
+    with pytest.raises(ValidationError):
+        model(**payload)
+
+
+@pytest.mark.parametrize("model", [EmployeeCreate, EmployeeUpdate])
+def test_employee_create_and_update_require_designation(model) -> None:
+    payload = VALID_CREATE.copy()
+    del payload["designation"]
+    with pytest.raises(ValidationError):
+        model(**payload)
 
 
 def test_employee_create_forbids_client_employee_id() -> None:
