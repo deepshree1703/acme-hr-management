@@ -4,9 +4,10 @@ import re
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 
 from app.constants import (
+    DESIGNATIONS_BY_DEPARTMENT,
     EMPLOYEE_ID_PATTERN,
     EMPLOYMENT_STATUSES,
     MAX_ANNUAL_GROSS_BASE_SALARY,
@@ -73,11 +74,37 @@ class EmployeeFields(BaseModel):
         return value
 
 
-class EmployeeCreate(EmployeeFields):
+class ControlledEmployeeFields(EmployeeFields):
+    """Employee fields restricted to the department-specific designation lists."""
+
+    @field_validator("department")
+    @classmethod
+    def validate_department(cls, value: str) -> str:
+        """Require one of the configured department names after trimming."""
+        if value not in DESIGNATIONS_BY_DEPARTMENT:
+            allowed = ", ".join(DESIGNATIONS_BY_DEPARTMENT)
+            raise ValueError(f"Department must be one of: {allowed}")
+        return value
+
+    @field_validator("designation")
+    @classmethod
+    def validate_designation(cls, value: str, info: ValidationInfo) -> str:
+        """Require a designation listed for the selected department."""
+        department = info.data.get("department")
+        if department is None:
+            return value
+        allowed_designations = DESIGNATIONS_BY_DEPARTMENT.get(department, ())
+        if value not in allowed_designations:
+            allowed = ", ".join(allowed_designations)
+            raise ValueError(f"Designation must be one of: {allowed}")
+        return value
+
+
+class EmployeeCreate(ControlledEmployeeFields):
     """Validated employee data for creating a record."""
 
 
-class EmployeeUpdate(EmployeeFields):
+class EmployeeUpdate(ControlledEmployeeFields):
     """Validated replacement employee data; employee_id cannot be changed."""
 
 
@@ -137,3 +164,4 @@ class EmployeeFilterOptions(BaseModel):
     departments: list[str]
     employment_statuses: list[str]
     currencies: list[str]
+    designations_by_department: dict[str, list[str]]
